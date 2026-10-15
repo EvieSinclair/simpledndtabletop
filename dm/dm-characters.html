@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        body { margin: 0; padding: 20px; background: #221a14; color: #2c1d11; font-family: 'Georgia', serif; }
+        h3 { color: #d4b375; font-family: sans-serif; margin-top:0; }
+        .roster-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        .sheet-parchment { background: #f4eae1 url('https://transparenttextures.com'); padding: 20px; border-radius: 4px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); border: 1px solid #dcd1c4; }
+        .sheet-parchment h1 { font-size: 1.4rem; color: #5c1e13; margin-top: 0; border-bottom: 1px solid #bda895; }
+    </style>
+</head>
+<body>
+    <h3>[ MONITOR DISPLAY: ALL-PLAYER-SHEETS.MD ]</h3>
+    <div class="roster-grid" id="roster">No player character nodes linked into active pipeline matrix yet...</div>
+
+    <script>
+        const master = window.parent;
+        function renderRoster() {
+            if(!master || !master.getGameState) return;
+            const container = document.getElementById('roster');
+            const sheets = master.getGameState().playerSheets;
+            
+            if(Object.keys(sheets).length === 0) return;
+            container.innerHTML = '';
+            
+            Object.keys(sheets).forEach(name => {
+                const rawMarkdown = sheets[name];
+                const card = document.createElement('div');
+                card.className = 'sheet-parchment';
+                card.innerHTML = marked.parse(rawMarkdown);
+                container.appendChild(card);
+            });
+        }
+        window.syncFromMaster = renderRoster;
+        renderRoster();
+    </script>
+</body>
+</html>
