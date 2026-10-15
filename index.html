@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Minimal WebRTC VTT</title>
+    <!-- Load PeerJS library for serverless browser-to-browser connection -->
+    <script src="https://unpkg.com"></script>
+    <style>
+        body { margin: 0; font-family: sans-serif; display: flex; background: #222; color: #fff; height: 100vh; overflow: hidden; }
+        #sidebar { width: 300px; background: #333; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #444; }
+        #map-container { flex-grow: 1; display: flex; justify-content: center; align-items: center; position: relative; }
+        canvas { background: #111; border: 1px solid #555; cursor: grab; }
+        textarea { width: 100%; height: 150px; background: #444; color: #fff; border: 1px solid #555; resize: none; }
+        button { padding: 10px; font-weight: bold; background: #44adff; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #3399ff; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar Layout -->
+    <div id="sidebar">
+        <h2>Mini VTT Setup</h2>
+        <div id="setup-controls">
+            <button id="btn-dm" onclick="initDM()">Login as DM</button>
+            <button id="btn-player" onclick="initPlayer()">Login as Player</button>
+        </div>
+        
+        <div id="connection-status">Select a role above</div>
+
+        <!-- DM Only Section -->
+        <div id="dm-panel" class="hidden">
+            <h3>DM Secret Notes</h3>
+            <textarea id="dm-notes" oninput="sendNotesUpdate(this.value)">3 Goblins are hiding behind the tree...</textarea>
+            <p style="font-size: 12px; color: #aaa;">Changes sync to players in real-time if you choose to broadcast.</p>
+        </div>
+
+        <!-- Player View Section -->
+        <div id="player-panel" class="hidden">
+            <h3>Shared Notes</h3>
+            <div id="shared-notes-display" style="background: #444; padding: 10px; min-height: 100px; border-radius: 4px;">No public notes yet.</div>
+        </div>
+    </div>
+
+    <!-- Map Board -->
+    <div id="map-container">
+        <canvas id="vttCanvas" width="600" height="600"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('vttCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let role = null;
+        let peer = null;
+        let conn = null;
+
+        // Simple VTT Game State
+        let gameState = {
+            tokenX: 100,
+            tokenY: 100,
+            tokenRadius: 25,
+            notes: ""
+        };
+
+        let isDragging = false;
+
+        // Render the simple game board (Grid + 1 Token)
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw simple grid lines
+            ctx.strokeStyle = '#333';
+            for (let i = 0; i < canvas.width; i += 50) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+            }
+
+            // Draw Token
+            ctx.beginPath();
+            ctx.arc(gameState.tokenX, gameState.tokenY, gameState.tokenRadius, 0, Math.PI * 2);
+            ctx.fillStyle = role === 'DM' ? '#ff4444' : '#44ff44'; // DM sees token as red, player sees green
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+
+        // Initialize as the Dungeon Master
+        function initDM() {
+            role = 'DM';
+            document.getElementById('setup-controls').classList.add('hidden');
+            document.getElementById('dm-panel').classList.remove('hidden');
+            
+            // Connect to free PeerJS cloud handshake server
+            peer = new Peer('my-custom-vtt-room-12345'); 
+            
+            peer.on('open', (id) => {
+                document.getElementById('connection-status').innerText = `DM Room Active! Tell player to connect using code: ${id}`;
+            });
+
+            // Listen for a player connecting to us
+            peer.on('connection', (connection) => {
+                conn = connection;
+                document.getElementById('connection-status').innerText = "Player Connected!";
+                setupDataListener();
+                // Send initial state to the newly connected player
+                conn.send({ type: 'SYNC_STATE', state: gameState });
+            });
+            render();
+        }
+
+        // Initialize as the Player
+        function initPlayer() {
+            role = 'Player';
+            document.getElementById('setup-controls').classList.add('hidden');
+            document.getElementById('player-panel').classList.remove('hidden');
+            document.getElementById('connection-status').innerText = "Connecting to DM...";
+
+            peer = new Peer(); // Random ID for player
+            
+            peer.on('open', () => {
+                // Connect directly to the fixed DM room ID
+                conn = peer.connect('my-custom-vtt-room-12345');
+                conn.on('open', () => {
+                    document.getElementById('connection-status').innerText = "Connected to DM!";
+                    setupDataListener();
+                });
+            });
+            render();
+        }
+
+        // Listen for network updates from the other window
+        function setupDataListener() {
+            conn.on('data', (data) => {
+                if (data.type === 'SYNC_STATE') {
+                    gameState = data.state;
+                    if (role === 'Player') {
+                        document.getElementById('shared-notes-display').innerText = gameState.notes;
+                    }
+                    render();
+                }
+            });
+        }
+
+        // Broadcast local map/note movements to the connected party
+        function broadcastState() {
+            if (conn && conn.open) {
+                conn.send({ type: 'SYNC_STATE', state: gameState });
+            }
+        }
+
+        function sendNotesUpdate(text) {
+            gameState.notes = text;
+            broadcastState();
+        }
+
+        // Simple Drag and Drop Token Logic
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // Check if mouse clicked inside the token circle
+            const dist = Math.sqrt((mouseX - gameState.tokenX)**2 + (mouseY - gameState.tokenY)**2);
+            if (dist < gameState.tokenRadius) {
+                isDragging = true;
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const rect = canvas.getBoundingClientRect();
+            gameState.tokenX = e.clientX - rect.left;
+            gameState.tokenY = e.clientY - rect.top;
+            render();
+            broadcastState(); // Instantly beam coordinates across the web
+        });
+
+        canvas.addEventListener('mouseup', () => { isDragging = false; });
+    </script>
+</body>
+</html>
