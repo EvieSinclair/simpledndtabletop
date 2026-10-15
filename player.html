@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Player Screen View</title>
+    <script src="https://cloudflare.com"></script>
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        body { margin: 0; font-family: 'Georgia', serif; background: #12151c; color: #fff; display: flex; flex-direction: column; height: 100vh; }
+        header { background: #0c0e12; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #5c1e13; }
+        #status { font-weight: bold; color: #ffaa00; font-family: sans-serif; }
+        .workspace { display: flex; flex-grow: 1; height: calc(100vh - 50px); }
+        .panel { width: 50%; height: 100%; padding: 25px; box-sizing: border-box; overflow-y: auto; }
+        .notes-panel { background: #f4eae1; color: #2c1d11; border-right: 2px solid #3d2b1f; }
+        .map-panel { background: #1c202b; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        canvas { background: #000; border: 2px solid #5c1e13; border-radius: 4px; cursor: grab; }
+        h3 { color: #5c1e13; margin-top: 0; border-bottom: 1px solid #bda895; padding-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div style="font-weight: bold; color: #ff4444; letter-spacing: 1px;">PARTY PLAYER FRAME VIEW</div>
+        <div id="status">Connecting to DM Server...</div>
+    </header>
+
+    <div class="workspace">
+        <div class="panel notes-panel">
+            <h3>Shared Campaign Log (.md Output)</h3>
+            <!-- Render Target for parsed markdown HTML content -->
+            <div id="preview">Waiting for DM notes payload data packets...</div>
+        </div>
+        <div class="panel map-panel">
+            <h3 style="color:#fff; border:none;">Tactical Battle Grid</h3>
+            <canvas id="vttCanvas" width="550" height="450"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Grab the Room Code directly out of the page URL parameters string
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get('room');
+
+        let peer = new Peer({ config: { iceServers: [{ urls: 'stun:://google.com' }] } });
+        let conn = null;
+        let gameState = { tokenX: 100, tokenY: 100, markdownContent: "" };
+
+        peer.on('open', () => {
+            conn = peer.connect(roomId);
+            conn.on('open', () => {
+                document.getElementById('status').style.color = "#43b581";
+                document.getElementById('status').innerText = "Connected to DM Table Session";
+            });
+
+            conn.on('data', data => {
+                if (data.type === 'SYNC') {
+                    gameState = data.state;
+                    // Parse DM markdown text on the fly into clean HTML components
+                    document.getElementById('preview').innerHTML = marked.parse(gameState.markdownContent);
+                    renderMap();
+                }
+            });
+        });
+
+        const canvas = document.getElementById('vttCanvas'); const ctx = canvas.getContext('2d'); let drag = false;
+        function renderMap() {
+            ctx.clearRect(0,0,550,450); ctx.fillStyle="#222"; ctx.fillRect(0,0,550,450);
+            ctx.beginPath(); ctx.arc(gameState.tokenX, gameState.tokenY, 20, 0, Math.PI*2);
+            ctx.fillStyle="#ff4444"; ctx.fill(); ctx.stroke();
+        }
+        canvas.addEventListener('mousedown', e => drag = true);
+        canvas.addEventListener('mousemove', e => {
+            if(!drag) return; const r = canvas.getBoundingClientRect();
+            gameState.tokenX = e.clientX - r.left; gameState.tokenY = e.clientY - r.top;
+            renderMap();
+            if(conn && conn.open) conn.send({ type: 'SYNC', state: gameState });
+        });
+        canvas.addEventListener('mouseup', () => drag = false);
+    </script>
+</body>
+</html>
