@@ -6,15 +6,22 @@
     <script src="https://cloudflare.com"></script>
     <script src="https://jsdelivr.net"></script>
     <style>
-        body { margin: 0; font-family: 'Georgia', serif; background: #12151c; color: #fff; display: flex; flex-direction: column; height: 100vh; }
+        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #12151c; color: #fff; display: flex; flex-direction: column; height: 100vh; }
         header { background: #0c0e12; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #5c1e13; }
         #status { font-weight: bold; color: #ffaa00; font-family: sans-serif; }
         .workspace { display: flex; flex-grow: 1; height: calc(100vh - 50px); }
-        .panel { width: 50%; height: 100%; padding: 25px; box-sizing: border-box; overflow-y: auto; }
-        .notes-panel { background: #f4eae1; color: #2c1d11; border-right: 2px solid #3d2b1f; }
-        .map-panel { background: #1c202b; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .panel { width: 50%; height: 100%; padding: 25px; box-sizing: border-box; overflow-y: auto; display: flex; flex-direction: column; }
+        .notes-panel { background: #f4eae1; color: #2c1d11; border-right: 2px solid #3d2b1f; font-family: 'Georgia', serif; }
+        .map-panel { background: #1c202b; gap: 20px; }
         canvas { background: #000; border: 2px solid #5c1e13; border-radius: 4px; cursor: grab; }
-        h3 { color: #5c1e13; margin-top: 0; border-bottom: 1px solid #bda895; padding-bottom: 5px; }
+        h3 { color: #5c1e13; margin-top: 0; border-bottom: 1px solid #bda895; padding-bottom: 5px; font-family: 'Georgia', serif; }
+        
+        /* Character Sheet Grid Layout */
+        .sheets-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; width: 100%; max-width: 550px; }
+        .char-card { background: #252b3a; border: 1px solid #3a435c; padding: 15px; border-radius: 6px; }
+        .char-card h4 { margin: 0 0 10px 0; color: #44adff; }
+        .form-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.9rem; }
+        .form-row input { background: #111; border: 1px solid #3a435c; color: white; padding: 4px; width: 60px; text-align: center; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -27,23 +34,24 @@
     <div class="workspace">
         <div class="panel notes-panel">
             <h3>Shared Campaign Log (.md Output)</h3>
-            <!-- Render Target for parsed markdown HTML content -->
-            <div id="preview">Waiting for DM notes payload data packets...</div>
+            <div id="preview">Waiting for DM notes payload...</div>
         </div>
         <div class="panel map-panel">
-            <h3 style="color:#fff; border:none;">Tactical Battle Grid</h3>
-            <canvas id="vttCanvas" width="550" height="450"></canvas>
+            <h3 style="color:#fff; border:none; margin:0;">Tactical Battle Grid</h3>
+            <canvas id="vttCanvas" width="550" height="300"></canvas>
+            
+            <h3 style="color:#fff; border:none; margin:0;">Your Character Sheets</h3>
+            <div class="sheets-container" id="player-sheets-wrapper"></div>
         </div>
     </div>
 
     <script>
-        // Grab the Room Code directly out of the page URL parameters string
         const urlParams = new URLSearchParams(window.location.search);
         const roomId = urlParams.get('room');
 
         let peer = new Peer({ config: { iceServers: [{ urls: 'stun:://google.com' }] } });
         let conn = null;
-        let gameState = { tokenX: 100, tokenY: 100, markdownContent: "" };
+        let gameState = { tokenX: 100, tokenY: 100, markdownContent: "", sheets: {} };
 
         peer.on('open', () => {
             conn = peer.connect(roomId);
@@ -55,16 +63,39 @@
             conn.on('data', data => {
                 if (data.type === 'SYNC') {
                     gameState = data.state;
-                    // Parse DM markdown text on the fly into clean HTML components
                     document.getElementById('preview').innerHTML = marked.parse(gameState.markdownContent);
+                    updateSheetsUI();
                     renderMap();
                 }
             });
         });
 
+        function updateSheetsUI() {
+            const wrapper = document.getElementById('player-sheets-wrapper');
+            wrapper.innerHTML = '';
+            Object.keys(gameState.sheets).forEach(key => {
+                const char = gameState.sheets[key];
+                const card = document.createElement('div');
+                card.className = 'char-card';
+                card.innerHTML = `
+                    <h4>${char.name}</h4>
+                    <div class="form-row"><label>HP</label><input type="number" value="${char.currentHp}" onchange="updateStat('${key}', 'currentHp', this.value)"></div>
+                    <div class="form-row"><label>Max HP</label><input type="number" value="${char.maxHp}" onchange="updateStat('${key}', 'maxHp', this.value)"></div>
+                    <div class="form-row"><label>AC</label><input type="number" value="${char.AC}" onchange="updateStat('${key}', 'AC', this.value)"></div>
+                `;
+                wrapper.appendChild(card);
+            });
+        }
+
+        function updateStat(charKey, field, value) {
+            gameState.sheets[charKey][field] = parseInt(value) || 0;
+            if (conn && conn.open) conn.send({ type: 'SYNC', state: gameState });
+        }
+
+        /* Tactical Canvas Tracking Setup */
         const canvas = document.getElementById('vttCanvas'); const ctx = canvas.getContext('2d'); let drag = false;
         function renderMap() {
-            ctx.clearRect(0,0,550,450); ctx.fillStyle="#222"; ctx.fillRect(0,0,550,450);
+            ctx.clearRect(0,0,550,300); ctx.fillStyle="#222"; ctx.fillRect(0,0,550,300);
             ctx.beginPath(); ctx.arc(gameState.tokenX, gameState.tokenY, 20, 0, Math.PI*2);
             ctx.fillStyle="#ff4444"; ctx.fill(); ctx.stroke();
         }
