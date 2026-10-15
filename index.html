@@ -4,46 +4,40 @@
     <meta charset="UTF-8">
     <title>Markdown Vault VTT</title>
     <script src="https://unpkg.com"></script>
-    <!-- Load Marked.js to parse and render markdown strings into beautiful HTML -->
     <script src="https://jsdelivr.net"></script>
     <style>
         body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #1e1e1e; color: #dcddde; display: flex; flex-direction: column; height: 100vh; }
-        
-        /* Nav & Structure */
         nav { background: #2f3136; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; height: 50px; border-bottom: 1px solid #202225; }
         .nav-brand { font-weight: bold; color: #44adff; }
         .nav-links { display: flex; gap: 5px; }
         .nav-btn { background: none; border: none; color: #b9bbbe; padding: 15px 20px; font-size: 0.95rem; cursor: pointer; }
         .nav-btn.active { color: #fff; border-bottom: 2px solid #44adff; background: #36393f; }
-        #connection-bar { background: #000; font-size: 0.8rem; padding: 4px 20px; text-align: right; color: #43b581; }
+        #connection-bar { background: #000; font-size: 0.8rem; padding: 4px 20px; text-align: right; color: #e67e22; font-weight: bold; }
 
         #content-area { flex-grow: 1; position: relative; }
         .tab-panel { display: none; height: calc(100vh - 78px); }
         .tab-panel.active { display: block; }
 
-        /* Vault Explorer Layout */
         .vault-layout { display: flex; height: 100%; }
         .file-tree-sidebar { width: 260px; background: #2f3136; border-right: 1px solid #202225; padding: 15px; overflow-y: auto; box-sizing: border-box; }
         .editor-view { flex-grow: 1; display: flex; flex-direction: column; padding: 25px; background: #36393f; overflow-y: auto; }
         
-        /* Folder Tree UI elements */
         .tree-folder { font-weight: bold; color: #f8b63e; margin: 8px 0 4px 0; cursor: pointer; user-select: none; }
         .tree-file { padding: 4px 12px; color: #b9bbbe; cursor: pointer; border-radius: 4px; font-size: 0.95rem; }
         .tree-file:hover, .tree-file.active { background: #40444b; color: #fff; }
         .tree-children { margin-left: 15px; border-left: 1px solid #4f545c; padding-left: 10px; }
 
-        /* Split-screen Markdown Editing Layout */
         .md-workspace { display: flex; gap: 20px; flex-grow: 1; height: 85%; }
         textarea { flex: 1; background: #2f3136; color: #fff; border: 1px solid #202225; border-radius: 4px; padding: 15px; font-family: monospace; font-size: 1rem; resize: none; }
         .md-preview { flex: 1; background: #2f3136; border: 1px solid #202225; border-radius: 4px; padding: 15px; overflow-y: auto; }
         .md-preview h1, .md-preview h2 { color: #fff; border-bottom: 1px solid #4f545c; padding-bottom: 4px; }
 
-        /* Canvas Panel Layout */
         .canvas-container { display: flex; justify-content: center; align-items: center; height: 100%; background: #23272a; }
         canvas { background: #111; border: 1px solid #4f545c; border-radius: 4px; }
         
         .setup-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 20px; }
-        .btn { padding: 12px 24px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; background: #44adff; color: white; }
+        .btn { padding: 12px 24px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; background: #44adff; color: white; margin: 5px; }
+        input[type="text"] { padding: 12px; border-radius: 4px; border: 1px solid #4f545c; background: #2f3136; color: white; width: 250px; text-align: center; font-size: 1rem; }
         .hidden { display: none !important; }
     </style>
 </head>
@@ -56,16 +50,20 @@
             <button class="nav-btn" onclick="switchTab('tab-map', this)">Tactical Map</button>
         </div>
     </nav>
-    <div id="connection-bar">Offline</div>
+    <div id="connection-bar">System Offline</div>
 
     <div id="content-area">
         <!-- Setup Screen -->
         <div id="setup-panel" class="tab-panel active">
             <div class="setup-screen">
                 <h2>Initialize Campaign Vault</h2>
-                <div style="display: flex; gap: 15px;">
-                    <button class="btn" onclick="initSession('DM')">Setup Dungeon Master Hub</button>
-                    <button class="btn" style="background:#43b581;" onclick="initSession('Player')">Join as Player</button>
+                <div style="text-align: center;">
+                    <button class="btn" onclick="initDM()">1. Host as Dungeon Master</button>
+                </div>
+                <hr style="width: 300px; border-color: #444; margin: 20px 0;">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                    <input type="text" id="join-room-id" placeholder="Paste DM Room ID here...">
+                    <button class="btn" style="background:#43b581;" onclick="initPlayer()">2. Join as Player</button>
                 </div>
             </div>
         </div>
@@ -73,9 +71,7 @@
         <!-- Markdown Vault Tab -->
         <div id="tab-notes" class="tab-panel">
             <div class="vault-layout">
-                <div class="file-tree-sidebar" id="sidebar-tree">
-                    <!-- File directories inject here -->
-                </div>
+                <div class="file-tree-sidebar" id="sidebar-tree"></div>
                 <div class="editor-view">
                     <h2 id="active-file-title" style="margin-top:0; color:#fff;">Select a file from your vault</h2>
                     <div class="md-workspace">
@@ -96,9 +92,8 @@
 
     <script>
         let role = null; let peer = null; let conn = null;
-        let activeFilePath = ["Campaign Notes", "Session 1 Summary.md"]; // Tracks open file location paths
+        let activeFilePath = ["Campaign Notes", "Session 1 Summary.md"];
 
-        // Custom state modeled precisely after local directory file concepts
         let gameState = {
             tokenX: 100, tokenY: 100,
             vault: {
@@ -126,31 +121,66 @@
             if(id === 'tab-map') renderMap();
         }
 
-        function initSession(chosenRole) {
-            role = chosenRole;
+        // --- HOST AS DM ---
+        function initDM() {
+            role = 'DM';
+            setupUI();
+
+            // Leaving this blank makes PeerJS give us a completely random, unique ID
+            peer = new Peer(); 
+            
+            peer.on('open', id => {
+                document.getElementById('connection-bar').style.color = "#ffaa00";
+                document.getElementById('connection-bar').innerText = `DM Mode | Copy this ID for Players: ${id}`;
+                console.log("DM Peer initialized with ID:", id);
+            });
+
+            peer.on('connection', c => {
+                conn = c;
+                handleConnect();
+            });
+        }
+
+        // --- JOIN AS PLAYER ---
+        function initPlayer() {
+            role = 'Player';
+            const dmId = document.getElementById('join-room-id').value.trim();
+            if (!dmId) {
+                alert("Please enter the DM's Room ID code first!");
+                return;
+            }
+
+            setupUI();
+            document.getElementById('connection-bar').innerText = "Linking to Campaign Server...";
+            
+            peer = new Peer();
+            peer.on('open', () => {
+                conn = peer.connect(dmId);
+                conn.on('open', () => {
+                    handleConnect();
+                });
+            });
+        }
+
+        function setupUI() {
             document.getElementById('setup-panel').classList.remove('active');
             document.getElementById('main-navigation').classList.remove('hidden');
             document.getElementById('tab-notes').classList.add('active');
-
+            
             if (role === 'DM') {
                 document.getElementById('markdown-editor').classList.remove('hidden');
-                peer = new Peer('vault-vtt-room-abc');
-                peer.on('open', id => document.getElementById('connection-bar').innerText = `DM Mode | Server Live: ${id}`);
-                peer.on('connection', c => { conn = c; setupDataListener(); sync(); });
             } else {
-                document.getElementById('markdown-editor').classList.add('hidden'); // Blind editor panel from players
-                peer = new Peer();
-                document.getElementById('connection-bar').innerText = "Linking to Campaign Server...";
-                peer.on('open', () => {
-                    conn = peer.connect('vault-vtt-room-abc');
-                    conn.on('open', () => {
-                        document.getElementById('connection-bar').innerText = "Connected to DM Vault.";
-                        setupDataListener();
-                    });
-                });
+                document.getElementById('markdown-editor').classList.add('hidden');
             }
             buildFileTreeUI();
             openFile();
+        }
+
+        function handleConnect() {
+            document.getElementById('connection-bar').style.color = "#43b581";
+            document.getElementById('connection-bar').innerText = "Sync Connected & Active";
+            setupDataListener();
+            if (role === 'DM') sync();
         }
 
         function setupDataListener() {
@@ -159,7 +189,6 @@
                     gameState = data.state;
                     buildFileTreeUI();
                     
-                    // Live dynamic sync of open file preview content blocks
                     const fileObj = getFileFromPath(activeFilePath);
                     if (fileObj) {
                         document.getElementById('markdown-preview').innerHTML = marked.parse(fileObj.content);
@@ -170,23 +199,23 @@
             });
         }
 
-        function sync() { if (conn && conn.open) conn.send({ type: 'SYNC', state: gameState }); }
-
-        // Recursively traces your state objects to build nested folder navigation elements
-        function buildFileTreeUI() {
-            const container = document.getElementById('sidebar-tree');
-            container.innerHTML = '<h3>Vault Navigation</h3>';
-            
-            function parseNode(obj, parentElement, currentPathArr) {
-                Object.keys(obj).forEach(key => {
-                    const node = obj[key];
-                    const nextPath = [...currentPathArr, key];
-                    
-                    if (node.type === 'folder') {
-                        const folderDiv = document.createElement('div');
-                        folderDiv.className = 'tree-folder';
-                        folderDiv.innerText = `📁 ${key}`;
+        function sync() { 
+            if (conn && conn.open) {
 Use code with caution.
+conn.send({ type: 'SYNC', state: gameState });
+}
+}
+function buildFileTreeUI() {
+const container = document.getElementById('sidebar-tree');
+container.innerHTML = 'Vault Navigation';
+function parseNode(obj, parentElement, currentPathArr) {
+Object.keys(obj).forEach(key => {
+const node = obj[key];
+const nextPath = [...currentPathArr, key];
+if (node.type === 'folder') {
+const folderDiv = document.createElement('div');
+folderDiv.className = 'tree-folder';
+folderDiv.innerText = 📁 ${key};
 parentElement.appendChild(folderDiv);
 const childContainer = document.createElement('div');
 childContainer.className = 'tree-children';
@@ -222,7 +251,6 @@ const fileObj = getFileFromPath(activeFilePath);
 if (!fileObj) return;
 document.getElementById('active-file-title').innerText = activeFilePath[activeFilePath.length - 1];
 document.getElementById('markdown-editor').value = fileObj.content;
-// Parse Markdown into structured display content HTML layouts using Marked.js
 document.getElementById('markdown-preview').innerHTML = marked.parse(fileObj.content);
 }
 function handleMarkdownEdit(text) {
@@ -233,7 +261,7 @@ document.getElementById('markdown-preview').innerHTML = marked.parse(text);
 sync();
 }
 }
-/* Minimal Map Logic for fallback cross checking continuity /
+/* Canvas Map Logic /
 const canvas = document.getElementById('vttCanvas'); const ctx = canvas.getContext('2d'); let drag = false;
 function renderMap() {
 ctx.clearRect(0,0,700,500); ctx.fillStyle="#333"; ctx.fillRect(0,0,700,500);
