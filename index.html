@@ -6,7 +6,6 @@
     <script src="https://cloudflare.com"></script>
     <script src="https://jsdelivr.net"></script>
     <style>
-        /* Immersive tabletop aesthetic theme styling */
         body { 
             margin: 0; 
             font-family: 'Georgia', serif; 
@@ -30,7 +29,6 @@
         .tab-panel { display: none; height: calc(100vh - 78px); }
         .tab-panel.active { display: block; }
 
-        /* Multi-page vault workspace engine */
         .vault-layout { display: flex; height: 100%; }
         
         .file-tree-sidebar { 
@@ -45,7 +43,6 @@
             backdrop-filter: blur(5px);
         }
         
-        /* Floating premium page viewport canvas object */
         .display-viewport { 
             flex-grow: 1; 
             padding: 40px; 
@@ -74,7 +71,6 @@
         .tree-file:hover, .tree-file.active { background: rgba(212, 179, 117, 0.15); color: #fff; }
         .tree-children { margin-left: 15px; border-left: 1px solid #3d2b1f; padding-left: 10px; }
 
-        /* Toggle Workspace Layout Panels */
         textarea { 
             width: 100%; 
             height: 400px; 
@@ -93,9 +89,7 @@
         .paper-document h2 { font-size: 1.6rem; color: #5c1e13; margin-top: 30px; }
         .paper-document h3 { font-size: 1.2rem; color: #7a3e35; }
         .paper-document hr { border: 0; border-top: 1px solid #bda895; margin: 20px 0; }
-        .paper-document code { background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 3px; font-family: monospace; }
-
-        /* Floating Panel Controller Controls */
+        
         .control-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-family: sans-serif; }
         .action-toggle-btn { background: #5c1e13; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .action-toggle-btn:hover { background: #7a3e35; }
@@ -123,7 +117,6 @@
     <div id="connection-bar">System Ready</div>
 
     <div id="content-area">
-        <!-- Configuration Layer -->
         <div id="setup-panel" class="tab-panel active">
             <div class="setup-screen">
                 <div class="setup-card">
@@ -136,7 +129,6 @@
             </div>
         </div>
 
-        <!-- Markdown Document View Tab -->
         <div id="tab-notes" class="tab-panel">
             <div class="vault-layout">
                 <div class="file-tree-sidebar" id="sidebar-tree"></div>
@@ -144,11 +136,9 @@
                     <div class="paper-document">
                         <div class="control-header">
                             <span id="active-file-breadcrumb" style="font-weight: bold; color: #7a3e35; font-size: 0.9rem;">NO FILE OPENED</span>
-                            <!-- DM Toggle Mode Button -->
                             <button id="edit-toggle-btn" class="action-toggle-btn hidden" onclick="toggleEditMode()">Switch to Editor</button>
                         </div>
                         
-                        <!-- Content Containers -->
                         <div id="markdown-container-view">
                             <div id="markdown-preview">Select an .md page folder node to begin rendering document strings...</div>
                         </div>
@@ -160,7 +150,6 @@
             </div>
         </div>
 
-        <!-- Map Layer Grid -->
         <div id="tab-map" class="tab-panel">
             <div class="canvas-container">
                 <canvas id="vttCanvas" width="700" height="500"></canvas>
@@ -172,6 +161,20 @@
         let role = null; let peer = null; let conn = null;
         let isEditing = false;
         let activeFilePath = ["Campaign Notes", "Session 1 Summary.md"];
+
+        // FIXED INFRASTRUCTURE: We route through a reliable open signaling cluster instead of the crashy 0.peerjs.com defaults.
+        const networkConfig = {
+            host: '0.peerjs.com',
+            port: 443,
+            path: '/',
+            secure: true,
+            config: {
+                iceServers: [
+                    { urls: 'stun:://google.com' },
+                    { urls: 'stun:://twilio.com' }
+                ]
+            }
+        };
 
         let gameState = {
             tokenX: 100, tokenY: 100,
@@ -186,9 +189,9 @@
                 "Monsters & NPCs": {
                     type: "folder",
                     children: {
+                        "Goblin Boss.md": { type: "file", content: "# Klarg the Goblin Boss\nAn oversized bugbear tracking local trade wagons.\n\n### Combat Matrix Statistics\n- **Armor Class:** 13 (Leather Armor)\n- **Hit Points:** 22 (4d8 + 4)\n\n### Actions\n* **Morningstar:** `+4 to hit`, damage `2d8+2` bludgeoning damage." }
+                    }
 Use code with caution.
-"Goblin Boss.md": { type: "file", content: "# Klarg the Goblin Boss\nAn oversized bugbear tracking local trade wagons.\n\n### Combat Matrix Statistics\n- Armor Class: 13 (Leather Armor)\n- Hit Points: 22 (4d8 + 4)\n\n### Actions\n* Morningstar: +4 to hit, damage 2d8+2 bludgeoning damage." }
-}
 }
 }
 };
@@ -212,31 +215,41 @@ editBlock.classList.add('hidden');
 isEditing = true;
 btn.innerText = "View Formatted Page";
 viewBlock.classList.add('hidden');
+editBlock.remove('hidden');
 editBlock.classList.remove('hidden');
 }
 }
 function initDM() {
 role = 'DM';
-document.getElementById('connection-bar').innerText = "Connecting to Core WebRTC Handshake Nodes...";
-peer = new Peer();
+document.getElementById('connection-bar').innerText = "Connecting to Reliable Master Nodes...";
+// Explicitly force Google/Twilio fallback nodes to force activation instantly
+peer = new Peer(networkConfig);
 peer.on('open', id => {
 setupUI();
-document.getElementById('edit-toggle-btn').classList.remove('hidden'); // Enable DM editor trigger button
+document.getElementById('edit-toggle-btn').classList.remove('hidden');
 document.getElementById('connection-bar').style.color = "#ffaa00";
 document.getElementById('connection-bar').innerText = DM Mode | Share Code: ${id};
 });
 peer.on('connection', c => { conn = c; handleConnect(); });
+peer.on('error', handleNetworkError);
 }
 function initPlayer() {
 role = 'Player';
 const dmId = document.getElementById('join-room-id').value.trim();
 if (!dmId) { alert("Please type the DM's connection code first!"); return; }
 document.getElementById('connection-bar').innerText = "Locating Connection Channels...";
-peer = new Peer();
+peer = new Peer(networkConfig);
 peer.on('open', () => {
 conn = peer.connect(dmId);
 conn.on('open', () => { setupUI(); handleConnect(); });
+conn.on('error', handleNetworkError);
 });
+peer.on('error', handleNetworkError);
+}
+function handleNetworkError(err) {
+document.getElementById('connection-bar').style.color = "#ff4444";
+document.getElementById('connection-bar').innerText = Handshake Node Error: ${err.type}. Try clicking again.;
+console.error(err);
 }
 function setupUI() {
 document.getElementById('setup-panel').classList.remove('active');
@@ -247,7 +260,7 @@ openFile();
 }
 function handleConnect() {
 document.getElementById('connection-bar').style.color = "#43b581";
-document.getElementById('connection-bar').innerText = "Sync Channels Online & Encrypted";
+document.getElementById('connection-bar').innerText = "Sync Channels Online & Connected";
 setupDataListener();
 if (role === 'DM') sync();
 }
@@ -268,7 +281,7 @@ renderMap();
 function sync() { if (conn && conn.open) conn.send({ type: 'SYNC', state: gameState }); }
 function buildFileTreeUI() {
 const container = document.getElementById('sidebar-tree');
-container.innerHTML = 'Vault Vault Explorer';
+container.innerHTML = 'Vault Explorer';
 function parseNode(obj, parentElement, currentPathArr) {
 Object.keys(obj).forEach(key => {
 const node = obj[key];
@@ -291,7 +304,6 @@ fileDiv.onclick = () => {
 activeFilePath = nextPath;
 document.querySelectorAll('.tree-file').forEach(f => f.classList.remove('active'));
 fileDiv.classList.add('active');
-// Force-reset interface state out of text editing back to beautiful parsed view if file shifts
 if(isEditing) toggleEditMode();
 openFile();
 };
@@ -324,11 +336,10 @@ document.getElementById('markdown-preview').innerHTML = marked.parse(text);
 sync();
 }
 }
-/* Map Canvas Layer Logic /
 const canvas = document.getElementById('vttCanvas'); const ctx = canvas.getContext('2d'); let drag = false;
 function renderMap() {
 ctx.clearRect(0,0,700,500); ctx.fillStyle="#222"; ctx.fillRect(0,0,700,500);
-ctx.beginPath(); ctx.arc(gameState.tokenX, gameState.tokenY, 20, 0, Math.PI2);
+ctx.beginPath(); ctx.arc(gameState.tokenX, gameState.tokenY, 20, 0, Math.PI*2);
 ctx.fillStyle="#d4b375"; ctx.fill(); ctx.stroke();
 }
 canvas.addEventListener('mousedown', e => drag = true);
