@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DM Master Browser Suite</title>
+    <script src="https://cloudflare.com"></script>
+    <style>
+        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #111; color: #fff; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* Browser-Style Top Tab Navigation Architecture */
+        .tab-bar { background: #1a1a1a; display: flex; align-items: flex-end; padding: 5px 10px 0 10px; height: 40px; border-bottom: 2px solid #d4b375; gap: 4px; }
+        .tab { background: #2b2b2b; color: #a0a0a0; padding: 8px 20px; border-radius: 6px 6px 0 0; border: 1px solid #333; border-bottom: none; cursor: pointer; font-size: 0.9rem; transition: 0.2s; font-family: monospace; }
+        .tab.active { background: #2c221d; color: #d4b375; font-weight: bold; border-color: #d4b375; padding-bottom: 9px; margin-bottom: -2px; z-index: 2; }
+        
+        .status-strip { background: #000; font-size: 0.8rem; padding: 4px 15px; text-align: right; color: #ffaa00; font-family: monospace; }
+        
+        /* Dynamic viewport system wrapper */
+        .viewport-container { flex-grow: 1; position: relative; background: #221a14; }
+        iframe { width: 100%; height: 100%; border: none; background: transparent; }
+    </style>
+</head>
+<body>
+
+    <div class="tab-bar">
+        <div class="tab active" onclick="switchTab('dm-notes.html', this)">📄 dm-notes.md</div>
+        <div class="tab" onclick="switchTab('dm-characters.html', this)">🛡️ dm-characters.md</div>
+        <div class="tab" onclick="switchTab('dm-maps.html', this)">🗺️ dm-maps.md</div>
+    </div>
+    <div id="status-strip" class="status-strip">Initializing Network Channels...</div>
+
+    <div class="viewport-container">
+        <!-- The active frame page loads inside this vector node -->
+        <iframe id="view-frame" src="dm-notes.html"></iframe>
+    </div>
+
+    <script>
+        // Centralized Master Synchronization State Machine Controller
+        let peer = new Peer({ config: { iceServers: [{ urls: 'stun:://google.com' }] } });
+        let activeConnections = [];
+        
+        let masterGameState = {
+            campaignNotes: "# DM Vault Log\n- Secret dungeon trap door is hidden inside row 4.\n- NPCs are hostile until bribed.",
+            playerSheets: {}, // Dynamically groups arriving custom character markdown string feeds
+            tokenX: 120, tokenY: 120
+        };
+
+        peer.on('open', id => {
+            document.getElementById('status-strip').innerText = `DM ACTIVE NET ID: ${id} (Distribute to your table)`;
+            window.dmRoomCode = id; // Store globally for iframe windows to read
+        });
+
+        peer.on('connection', conn => {
+            activeConnections.push(conn);
+            document.getElementById('status-strip').style.color = "#43b581";
+            document.getElementById('status-strip').innerText = `Table Engine Live | Connections: ${activeConnections.length}`;
+            
+            conn.on('data', data => {
+                if (data.type === 'PLAYER_UPDATE') {
+                    // Map incoming custom character notes into our master dashboard memory index
+                    masterGameState.playerSheets[data.playerName] = data.markdown;
+                    broadcastToTable();
+                    refreshActiveIframe();
+                }
+                if (data.type === 'MAP_MOVE') {
+                    masterGameState.tokenX = data.x;
+                    masterGameState.tokenY = data.y;
+                    broadcastToTable();
+                    refreshActiveIframe();
+                }
+            });
+            
+            // Deliver initial tracking logs down to the player pipeline configuration frame
+            conn.send({ type: 'CAMPAIGN_SYNC', state: masterGameState });
+        });
+
+        function broadcastToTable() {
+            activeConnections.forEach(conn => {
+                if(conn.open) conn.send({ type: 'CAMPAIGN_SYNC', state: masterGameState });
+            });
+        }
+
+        function switchTab(pageUrl, tabElement) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            tabElement.classList.add('active');
+            document.getElementById('view-frame').src = pageUrl;
+        }
+
+        function refreshActiveIframe() {
+            const frame = document.getElementById('view-frame').contentWindow;
+            if (frame && typeof frame.syncFromMaster === 'function') {
+                frame.syncFromMaster(masterGameState);
+            }
+        }
+
+        // Global functions hook enabling child iframe tabs to modify state directly
+        window.getGameState = () => masterGameState;
+        window.updateGameStateNotes = (text) => { masterGameState.campaignNotes = text; broadcastToTable(); };
+        window.updateGameStateMap = (x, y) => { masterGameState.tokenX = x; masterGameState.tokenY = y; broadcastToTable(); };
+    </script>
+</body>
+</html>
