@@ -6,22 +6,29 @@
     <script src="https://cloudflare.com"></script>
     <script src="https://jsdelivr.net"></script>
     <style>
-        body { margin: 0; font-family: 'Georgia', serif; background: #1a1512; color: #dcddde; display: flex; flex-direction: column; height: 100vh; }
+        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1512; color: #dcddde; display: flex; flex-direction: column; height: 100vh; }
         header { background: #0a0806; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #d4b375; }
         #status { font-weight: bold; color: #ffaa00; font-family: monospace; }
         .workspace { display: flex; flex-grow: 1; height: calc(100vh - 50px); }
         .panel { width: 50%; height: 100%; padding: 20px; box-sizing: border-box; overflow-y: auto; display: flex; flex-direction: column; }
         .notes-panel { background: #221a14; border-right: 2px solid #3d2b1f; }
-        .map-panel { background: #161210; align-items: center; justify-content: center; }
+        .map-panel { background: #161210; gap: 20px; }
         textarea { width: 100%; flex-grow: 1; background: #111; color: #fff; border: 1px solid #3d2b1f; padding: 15px; font-family: monospace; font-size: 1rem; resize: none; border-radius: 4px; }
         canvas { background: #000; border: 2px solid #d4b375; border-radius: 4px; cursor: grab; }
-        h3 { color: #d4b375; margin-top: 0; }
+        h3 { color: #d4b375; margin-top: 0; border-bottom: 1px solid #3d2b1f; padding-bottom: 5px; }
+        
+        /* Character Sheet Grid Layout */
+        .sheets-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; width: 100%; max-width: 550px; }
+        .char-card { background: #2a221d; border: 1px solid #44352a; padding: 15px; border-radius: 6px; }
+        .char-card h4 { margin: 0 0 10px 0; color: #ecd09b; }
+        .form-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.9rem; }
+        .form-row input { background: #111; border: 1px solid #44352a; color: white; padding: 4px; width: 60px; text-align: center; border-radius: 4px; }
     </style>
 </head>
 <body>
 
     <header>
-        <div style="font-weight: bold; color: #d4b375; letter-spacing: 1px;">DM MASTER CONTROL CONTROL</div>
+        <div style="font-weight: bold; color: #d4b375; letter-spacing: 1px;">DM MASTER CONTROL BOARD</div>
         <div id="status">Generating Room Identity...</div>
     </header>
 
@@ -32,19 +39,32 @@
         </div>
         <div class="panel map-panel">
             <h3>Tactical Battle Grid</h3>
-            <canvas id="vttCanvas" width="550" height="450"></canvas>
+            <canvas id="vttCanvas" width="550" height="300"></canvas>
+            
+            <h3>Party Roster Sheets</h3>
+            <div class="sheets-container" id="dm-sheets-wrapper"></div>
         </div>
     </div>
 
     <script>
         let peer = new Peer({ config: { iceServers: [{ urls: 'stun:://google.com' }] } });
         let conn = null;
-        let gameState = { tokenX: 100, tokenY: 100, markdownContent: "" };
+        
+        // ADDED: Structured character sheet objects added right into our global synced state
+        let gameState = { 
+            tokenX: 100, 
+            tokenY: 100, 
+            markdownContent: "",
+            sheets: {
+                char1: { name: "Valeros (Fighter)", currentHp: 24, maxHp: 28, AC: 16, str: 16 },
+                char2: { name: "Mialee (Wizard)", currentHp: 12, maxHp: 16, AC: 12, str: 8 }
+            }
+        };
 
         gameState.markdownContent = document.getElementById('editor').value;
 
         peer.on('open', id => {
-            document.getElementById('status').innerText = `Room Code: ${id} (Share this with players)`;
+            document.getElementById('status').innerText = `Room Code: ${id}`;
         });
 
         peer.on('connection', c => {
@@ -56,6 +76,7 @@
                 if (data.type === 'SYNC') {
                     gameState = data.state;
                     document.getElementById('editor').value = gameState.markdownContent;
+                    updateSheetsUI();
                     renderMap();
                 }
             });
@@ -69,10 +90,33 @@
             sync();
         }
 
-        // Setup dragging and token physics tracking elements
+        // Dynamically populates sheet input cards
+        function updateSheetsUI() {
+            const wrapper = document.getElementById('dm-sheets-wrapper');
+            wrapper.innerHTML = '';
+            Object.keys(gameState.sheets).forEach(key => {
+                const char = gameState.sheets[key];
+                const card = document.createElement('div');
+                card.className = 'char-card';
+                card.innerHTML = `
+                    <h4>${char.name}</h4>
+                    <div class="form-row"><label>HP</label><input type="number" value="${char.currentHp}" onchange="updateStat('${key}', 'currentHp', this.value)"></div>
+                    <div class="form-row"><label>Max HP</label><input type="number" value="${char.maxHp}" onchange="updateStat('${key}', 'maxHp', this.value)"></div>
+                    <div class="form-row"><label>AC</label><input type="number" value="${char.AC}" onchange="updateStat('${key}', 'AC', this.value)"></div>
+                `;
+                wrapper.appendChild(card);
+            });
+        }
+
+        function updateStat(charKey, field, value) {
+            gameState.sheets[charKey][field] = parseInt(value) || 0;
+            sync();
+        }
+
+        /* Tactical Canvas Tracking Setup */
         const canvas = document.getElementById('vttCanvas'); const ctx = canvas.getContext('2d'); let drag = false;
         function renderMap() {
-            ctx.clearRect(0,0,550,450); ctx.fillStyle="#222"; ctx.fillRect(0,0,550,450);
+            ctx.clearRect(0,0,550,300); ctx.fillStyle="#222"; ctx.fillRect(0,0,550,300);
             ctx.beginPath(); ctx.arc(gameState.tokenX, gameState.tokenY, 20, 0, Math.PI*2);
             ctx.fillStyle="#d4b375"; ctx.fill(); ctx.stroke();
         }
@@ -83,6 +127,8 @@
             renderMap(); sync();
         });
         canvas.addEventListener('mouseup', () => drag = false);
+        
+        updateSheetsUI();
         renderMap();
     </script>
 </body>
