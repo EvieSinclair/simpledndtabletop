@@ -2,182 +2,257 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minimal WebRTC VTT</title>
-    <!-- Load PeerJS library for serverless browser-to-browser connection -->
+    <title>Advanced Interactive VTT</title>
     <script src="https://unpkg.com"></script>
     <style>
-        body { margin: 0; font-family: sans-serif; display: flex; background: #222; color: #fff; height: 100vh; overflow: hidden; }
-        #sidebar { width: 300px; background: #333; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #444; }
-        #map-container { flex-grow: 1; display: flex; justify-content: center; align-items: center; position: relative; }
-        canvas { background: #111; border: 1px solid #555; cursor: grab; }
-        textarea { width: 100%; height: 150px; background: #444; color: #fff; border: 1px solid #555; resize: none; }
-        button { padding: 10px; font-weight: bold; background: #44adff; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #3399ff; }
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a1a; color: #fff; display: flex; flex-direction: column; height: 100vh; }
+        
+        /* Navigation Styles */
+        nav { background: #2c2c2c; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; height: 50px; border-bottom: 2px solid #3a3a3a; }
+        .nav-brand { font-weight: bold; font-size: 1.2rem; color: #44adff; }
+        .nav-links { display: flex; gap: 10px; }
+        .nav-btn { background: none; border: none; color: #aaa; padding: 15px 20px; font-size: 1rem; cursor: pointer; transition: 0.2s; }
+        .nav-btn:hover, .nav-btn.active { color: #fff; background: #3a3a3a; border-bottom: 3px solid #44adff; }
+        
+        /* Connection Status Header */
+        #connection-bar { background: #111; font-size: 0.85rem; padding: 5px 20px; text-align: right; color: #00ff66; border-bottom: 1px solid #222; }
+
+        /* Content Container & Tabs */
+        #content-area { flex-grow: 1; position: relative; overflow-y: auto; padding: 20px; }
+        .tab-panel { display: none; height: 100%; }
+        .tab-panel.active { display: block; }
+
+        /* Setup / Welcome Display */
+        .setup-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80% ; gap: 20px;}
+        .primary-btn { padding: 15px 30px; font-size: 1.1rem; font-weight: bold; background: #44adff; border: none; border-radius: 6px; cursor: pointer; color: white; }
+        .primary-btn:hover { background: #3399ff; }
+
+        /* Character Sheet Grid Layout */
+        .sheet-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .character-card { background: #2a2a2a; border: 1px solid #444; border-radius: 8px; padding: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .character-card h3 { margin-top: 0; color: #44adff; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        .form-group { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .form-group label { font-size: 0.9rem; color: #ccc; }
+        .form-group input { background: #333; border: 1px solid #555; color: white; padding: 6px; border-radius: 4px; width: 80px; text-align: center; }
+
+        /* Notes & Canvas Centering Layout */
+        .centered-view { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        canvas { background: #111; border: 2px solid #444; border-radius: 4px; cursor: grab; }
+        textarea { width: 100%; max-width: 600px; height: 300px; background: #2a2a2a; color: #fff; border: 1px solid #444; padding: 15px; border-radius: 6px; resize: none; font-size: 1rem; }
+        
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <!-- Sidebar Layout -->
-    <div id="sidebar">
-        <h2>Mini VTT Setup</h2>
-        <div id="setup-controls">
-            <button id="btn-dm" onclick="initDM()">Login as DM</button>
-            <button id="btn-player" onclick="initPlayer()">Login as Player</button>
+    <!-- Top Navigation Bar -->
+    <nav>
+        <div class="nav-brand">Custom 5e VTT Dashboard</div>
+        <div class="nav-links hidden" id="main-navigation">
+            <button class="nav-btn active" onclick="switchTab('tab-map', this)">Tactical Map</button>
+            <button class="nav-btn" onclick="switchTab('tab-sheets', this)">Character Sheets</button>
+            <button class="nav-btn" onclick="switchTab('tab-notes', this)">Campaign Notes</button>
         </div>
-        
-        <div id="connection-status">Select a role above</div>
+    </nav>
+    <div id="connection-bar">System Standby</div>
 
-        <!-- DM Only Section -->
-        <div id="dm-panel" class="hidden">
-            <h3>DM Secret Notes</h3>
-            <textarea id="dm-notes" oninput="sendNotesUpdate(this.value)">3 Goblins are hiding behind the tree...</textarea>
-            <p style="font-size: 12px; color: #aaa;">Changes sync to players in real-time if you choose to broadcast.</p>
+    <!-- Central Action Hub -->
+    <div id="content-area">
+
+        <!-- Initial Configuration Screen -->
+        <div id="setup-panel" class="tab-panel active">
+            <div class="setup-screen">
+                <h2>Initialize Your Session</h2>
+                <div style="display: flex; gap: 20px;">
+                    <button class="primary-btn" onclick="initSession('DM')">Launch as Dungeon Master</button>
+                    <button class="primary-btn" style="background:#44ffaa; color:#111;" onclick="initSession('Player')">Launch as Active Player</button>
+                </div>
+            </div>
         </div>
 
-        <!-- Player View Section -->
-        <div id="player-panel" class="hidden">
-            <h3>Shared Notes</h3>
-            <div id="shared-notes-display" style="background: #444; padding: 10px; min-height: 100px; border-radius: 4px;">No public notes yet.</div>
+        <!-- Tab 1: Tactical Grid Map -->
+        <div id="tab-map" class="tab-panel">
+            <div class="centered-view">
+                <h3>Battle Map Grid</h3>
+                <canvas id="vttCanvas" width="600" height="400"></canvas>
+            </div>
         </div>
-    </div>
 
-    <!-- Map Board -->
-    <div id="map-container">
-        <canvas id="vttCanvas" width="600" height="600"></canvas>
+        <!-- Tab 2: Dynamic Character Sheets -->
+        <div id="tab-sheets" class="tab-panel">
+            <h2>Party Roster</h2>
+            <div class="sheet-container" id="sheets-wrapper">
+                <!-- Data injection point via updateSheetsUI() -->
+            </div>
+        </div>
+
+        <!-- Tab 3: Campaign Journals -->
+        <div id="tab-notes" class="tab-panel">
+            <div class="centered-view">
+                <h3 id="notes-title">Shared Campaign Log</h3>
+                <textarea id="campaign-notes" oninput="handleNotesInput(this.value)" placeholder="Start typing session tracking data here..."></textarea>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        const canvas = document.getElementById('vttCanvas');
-        const ctx = canvas.getContext('2d');
-        
         let role = null;
         let peer = null;
         let conn = null;
 
-        // Simple VTT Game State
+        // Structured state reflecting layout fields
         let gameState = {
-            tokenX: 100,
-            tokenY: 100,
-            tokenRadius: 25,
-            notes: ""
+            tokenX: 150,
+            tokenY: 150,
+            tokenRadius: 20,
+            notes: "",
+            characters: {
+                char1: { name: "Valeros (Fighter)", currentHp: 24, maxHp: 28, str: 16, dex: 12, AC: 16 },
+                char2: { name: "Mialee (Wizard)", currentHp: 12, maxHp: 16, str: 8, dex: 14, AC: 12 }
+            }
         };
 
         let isDragging = false;
+        const canvas = document.getElementById('vttCanvas');
+        const ctx = canvas.getContext('2d');
 
-        // Render the simple game board (Grid + 1 Token)
-        function render() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Handles tab panel switching logic
+        function switchTab(panelId, buttonNode) {
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
             
-            // Draw simple grid lines
-            ctx.strokeStyle = '#333';
-            for (let i = 0; i < canvas.width; i += 50) {
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
-            }
+            document.getElementById(panelId).classList.add('active');
+            buttonNode.classList.add('active');
 
-            // Draw Token
-            ctx.beginPath();
-            ctx.arc(gameState.tokenX, gameState.tokenY, gameState.tokenRadius, 0, Math.PI * 2);
-            ctx.fillStyle = role === 'DM' ? '#ff4444' : '#44ff44'; // DM sees token as red, player sees green
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 3;
-            ctx.stroke();
+            if (panelId === 'tab-map') renderMap();
         }
 
-        // Initialize as the Dungeon Master
-        function initDM() {
-            role = 'DM';
-            document.getElementById('setup-controls').classList.add('hidden');
-            document.getElementById('dm-panel').classList.remove('hidden');
-            
-            // Connect to free PeerJS cloud handshake server
-            peer = new Peer('my-custom-vtt-room-12345'); 
-            
-            peer.on('open', (id) => {
-                document.getElementById('connection-status').innerText = `DM Room Active! Tell player to connect using code: ${id}`;
-            });
+        // Initialize Peer System connections
+        function initSession(selectedRole) {
+            role = selectedRole;
+            document.getElementById('setup-panel').classList.remove('active');
+            document.getElementById('main-navigation').classList.remove('hidden');
+            document.getElementById('tab-map').classList.add('active');
 
-            // Listen for a player connecting to us
-            peer.on('connection', (connection) => {
-                conn = connection;
-                document.getElementById('connection-status').innerText = "Player Connected!";
-                setupDataListener();
-                // Send initial state to the newly connected player
-                conn.send({ type: 'SYNC_STATE', state: gameState });
-            });
-            render();
-        }
-
-        // Initialize as the Player
-        function initPlayer() {
-            role = 'Player';
-            document.getElementById('setup-controls').classList.add('hidden');
-            document.getElementById('player-panel').classList.remove('hidden');
-            document.getElementById('connection-status').innerText = "Connecting to DM...";
-
-            peer = new Peer(); // Random ID for player
-            
-            peer.on('open', () => {
-                // Connect directly to the fixed DM room ID
-                conn = peer.connect('my-custom-vtt-room-12345');
-                conn.on('open', () => {
-                    document.getElementById('connection-status').innerText = "Connected to DM!";
-                    setupDataListener();
+            if (role === 'DM') {
+                document.getElementById('notes-title').innerText = "DM Core Campaign Notebook";
+                peer = new Peer('vtt-synchronized-room-999');
+                peer.on('open', (id) => {
+                    document.getElementById('connection-bar').innerText = `DM Status: Broadcasting Room ID [ ${id} ]`;
                 });
-            });
-            render();
+                peer.on('connection', (connection) => {
+                    conn = connection;
+                    document.getElementById('connection-bar').innerText = "Player Connected. Sync Engine Live.";
+                    setupDataListener();
+                    sendState();
+                });
+            } else {
+                document.getElementById('notes-title').innerText = "Player Shared Log View";
+                document.getElementById('campaign-notes').disabled = true; // Lock notes interface for players
+                document.getElementById('connection-bar').innerText = "Handshaking with DM Peer ID...";
+                peer = new Peer();
+                peer.on('open', () => {
+                    conn = peer.connect('vtt-synchronized-room-999');
+                    conn.on('open', () => {
+                        document.getElementById('connection-bar').innerText = "Connected to DM. Sync Engine Live.";
+                        setupDataListener();
+                    });
+                });
+            }
+            updateSheetsUI();
+            renderMap();
         }
 
-        // Listen for network updates from the other window
+        // Monitors Peer connection channels for state adjustments
         function setupDataListener() {
             conn.on('data', (data) => {
-                if (data.type === 'SYNC_STATE') {
+                if (data.type === 'SYNC') {
                     gameState = data.state;
+                    
+                    // Don't update the active text textarea element while typing to avoid jerky cursor resets
                     if (role === 'Player') {
-                        document.getElementById('shared-notes-display').innerText = gameState.notes;
+                        document.getElementById('campaign-notes').value = gameState.notes;
                     }
-                    render();
+                    
+                    updateSheetsUI();
+                    renderMap();
                 }
             });
         }
 
-        // Broadcast local map/note movements to the connected party
-        function broadcastState() {
+        function sendState() {
             if (conn && conn.open) {
-                conn.send({ type: 'SYNC_STATE', state: gameState });
+                conn.send({ type: 'SYNC', state: gameState });
             }
         }
 
-        function sendNotesUpdate(text) {
-            gameState.notes = text;
-            broadcastState();
-        }
+        // Dynamically populates and maps HTML components from state
+        function updateSheetsUI() {
+            const wrapper = document.getElementById('sheets-wrapper');
+            wrapper.innerHTML = ''; // Wipe and re-render updates
 
-        // Simple Drag and Drop Token Logic
-        canvas.addEventListener('mousedown', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-            
-            // Check if mouse clicked inside the token circle
-            const dist = Math.sqrt((mouseX - gameState.tokenX)**2 + (mouseY - gameState.tokenY)**2);
-            if (dist < gameState.tokenRadius) {
-                isDragging = true;
-            }
-        });
-
-        canvas.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            const rect = canvas.getBoundingClientRect();
-            gameState.tokenX = e.clientX - rect.left;
-            gameState.tokenY = e.clientY - rect.top;
-            render();
-            broadcastState(); // Instantly beam coordinates across the web
-        });
-
-        canvas.addEventListener('mouseup', () => { isDragging = false; });
-    </script>
-</body>
-</html>
+            Object.keys(gameState.characters).forEach(key => {
+                const char = gameState.characters[key];
+                const card = document.createElement('div');
+                card.className = 'character-card';
+                card.innerHTML = `
+                    <h3>${char.name}</h3>
+                    <div class="form-group">
+                        <label>Current HP</label>
+                        <input type="number" value="${char.currentHp}" onchange="updateStat('${key}', 'currentHp', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label>Max HP</label>
+Use code with caution.
+Armor Class (AC)
+Strength
+`;
+wrapper.appendChild(card);
+});
+}
+// Updates inner values upon field interactions and pushes state downstream
+function updateStat(charKey, statField, val) {
+gameState.characters[charKey][statField] = parseInt(val) || 0;
+sendState();
+}
+function handleNotesInput(text) {
+gameState.notes = text;
+sendState();
+}
+// Basic Canvas Renderer Matrix
+function renderMap() {
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+ctx.strokeStyle = '#2d2d2d';
+for (let i = 0; i < canvas.width; i += 40) {
+ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+}
+for (let j = 0; j < canvas.height; j += 40) {
+ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(canvas.width, j); ctx.stroke();
+}
+ctx.beginPath();
+ctx.arc(gameState.tokenX, gameState.tokenY, gameState.tokenRadius, 0, Math.PI * 2);
+ctx.fillStyle = '#ff4444';
+ctx.fill();
+ctx.strokeStyle = '#fff';
+ctx.lineWidth = 2;
+ctx.stroke();
+}
+// Coordinate interaction monitors
+canvas.addEventListener('mousedown', (e) => {
+const rect = canvas.getBoundingClientRect();
+const mouseX = e.clientX - rect.left;
+const mouseY = e.clientY - rect.top;
+if (Math.sqrt((mouseX - gameState.tokenX)**2 + (mouseY - gameState.tokenY)**2) < gameState.tokenRadius) {
+isDragging = true;
+}
+});
+canvas.addEventListener('mousemove', (e) => {
+if (!isDragging) return;
+const rect = canvas.getBoundingClientRect();
+gameState.tokenX = e.clientX - rect.left;
+gameState.tokenY = e.clientY - rect.top;
+renderMap();
+sendState();
+});
+canvas.addEventListener('mouseup', () => isDragging = false);
