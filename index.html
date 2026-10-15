@@ -2,51 +2,41 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Campaign Portal - Login</title>
+    <title>Roles Hub Matrix</title>
     <style>
-        body { 
-            margin: 0; font-family: 'Georgia', serif; 
-            background: #111 url('https://unsplash.com') no-repeat center center fixed; 
-            background-size: cover; display: flex; align-items: center; justify-content: center; height: 100vh; 
-        }
-        .login-card { 
-            background: rgba(30, 25, 20, 0.95); padding: 40px; border-radius: 8px; 
-            border: 2px solid #3d2b1f; text-align: center; color: #d4c5b9; box-shadow: 0 10px 30px rgba(0,0,0,0.6); backdrop-filter: blur(5px);
-        }
-        h2 { color: #d4b375; margin-top: 0; letter-spacing: 1px; }
-        .btn { padding: 12px 28px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; margin: 10px; font-size: 1rem; transition: 0.2s; }
-        .btn-dm { background: #d4b375; color: #111; }
-        .btn-dm:hover { background: #ecd09b; }
-        .btn-player { background: #5c1e13; color: white; }
-        .btn-player:hover { background: #7a3e35; }
-        input[type="text"] { padding: 12px; border-radius: 4px; border: 1px solid #3d2b1f; background: #111; color: white; width: 220px; text-align: center; font-size: 1rem; margin-top: 15px; }
+        body { margin: 0; font-family: 'Georgia', serif; background: #111; color: #d4c5b9; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .vault-card { background: #1c1814; border: 2px solid #3d2b1f; padding: 40px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; max-width: 400px; width: 100%; }
+        h1 { color: #d4b375; margin-top: 0; font-size: 1.8rem; border-bottom: 1px solid #3d2b1f; padding-bottom: 10px; }
+        .role-btn { display: block; width: 100%; padding: 12px; margin: 15px 0; background: #3d2b1f; border: 1px solid #d4b375; color: #ecd09b; font-weight: bold; font-size: 1rem; border-radius: 4px; cursor: pointer; text-decoration: none; box-sizing: border-box;}
+        .role-btn:hover { background: #d4b375; color: #111; }
+        input { width: 100%; padding: 10px; margin: 8px 0; background: #111; border: 1px solid #3d2b1f; color: white; border-radius: 4px; box-sizing: border-box; text-align: center; }
     </style>
 </head>
 <body>
 
-    <div class="login-card">
-        <h2>CAMPAIGN PORTAL</h2>
-        <p>Select your table operating clearance:</p>
+    <div class="vault-card">
+        <h1># ROLES.MD</h1>
+        <p>Select your operational table alignment configuration clearance level:</p>
         
-        <!-- Routes directly to your standalone DM file -->
-        <button class="btn btn-dm" onclick="window.location.href='dm.html'">Host as Dungeon Master</button>
+        <!-- Launch the Master DM frame layout directly inside its nested directory folder -->
+        <button class="role-btn" onclick="window.location.href='dm/dashboard.html'">[ DM Clearance Portal ]</button>
         
-        <div style="margin: 20px 0; border-top: 1px solid #3d2b1f;"></div>
+        <div style="margin: 25px 0; border-top: 1px dashed #3d2b1f;"></div>
         
-        <!-- Routes directly to your standalone Player file with their code attached -->
-        <input type="text" id="code-input" placeholder="Enter DM Room Code..."><br>
-        <button class="btn btn-player" onclick="joinAsPlayer()">Join as Party Player</button>
+        <!-- Player Unique Code & Credentials Pad Verification -->
+        <input type="text" id="player-name" placeholder="Character Name (e.g. Valeros)">
+        <input type="text" id="room-code" placeholder="Enter DM Unique Passcode Key...">
+        <button class="role-btn" style="background:#5c1e13; border-color:#7a3e35; color:white;" onclick="launchPlayer()">[ Connect Character Node ]</button>
     </div>
 
     <script>
-        function joinAsPlayer() {
-            const code = document.getElementById('code-input').value.trim();
-            if (!code) {
-                alert("Please enter a DM Room Code first!");
-                return;
-            }
-            // Pass the typed code to the player page using a standard URL parameter
-            window.location.href = `player.html?room=${code}`;
+        function launchPlayer() {
+            const name = document.getElementById('player-name').value.trim();
+            const code = document.getElementById('room-code').value.trim();
+            if (!name || !code) { alert("Please input both Character Name and DM Access Passcode!"); return; }
+            
+            // Forward variables down to the active player module using URL parameter vectors
+            window.location.href = `player.html?name=${encodeURIComponent(name)}&room=${encodeURIComponent(code)}`;
         }
     </script>
 </body>
