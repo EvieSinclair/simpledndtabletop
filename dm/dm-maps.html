@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { margin: 0; padding: 20px; background: #161210; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; box-sizing: border-box;}
+        canvas { background: #000; border: 2px solid #d4b375; border-radius: 4px; cursor: grab; }
+        h3 { color: #d4b375; font-family: sans-serif; margin-top: 0;}
+    </style>
+</head>
+<body>
+    <h3>[ VISUAL BOARD: STANDALONE-DM-MAPS.MD ]</h3>
+    <canvas id="vttCanvas" width="600" height="400"></canvas>
+
+    <script>
+        const master = window.parent;
+        const canvas = document.getElementById('vttCanvas'); const ctx = canvas.getContext('2d'); let drag = false;
+        
+        function draw() {
+            if(!master || !master.getGameState) return;
+            const state = master.getGameState();
+            ctx.clearRect(0,0,600,400); ctx.fillStyle="#222"; ctx.fillRect(0,0,600,400);
+            ctx.beginPath(); ctx.arc(state.tokenX, state.tokenY, 20, 0, Math.PI*2);
+            ctx.fillStyle="#d4b375"; ctx.fill(); ctx.stroke();
+        }
+        
+        canvas.addEventListener('mousedown', () => drag = true);
+        canvas.addEventListener('mousemove', e => {
+            if(!drag || !master || !master.updateGameStateMap) return;
+            const r = canvas.getBoundingClientRect();
+            master.updateGameStateMap(e.clientX - r.left, e.clientY - r.top);
+            draw();
+        });
+        canvas.addEventListener('mouseup', () => drag = false);
+        window.syncFromMaster = draw;
+        draw();
+    </script>
+</body>
+</html>
