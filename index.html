@@ -2,257 +2,248 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Advanced Interactive VTT</title>
+    <title>Markdown Vault VTT</title>
     <script src="https://unpkg.com"></script>
+    <!-- Load Marked.js to parse and render markdown strings into beautiful HTML -->
+    <script src="https://jsdelivr.net"></script>
     <style>
-        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a1a; color: #fff; display: flex; flex-direction: column; height: 100vh; }
+        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: #1e1e1e; color: #dcddde; display: flex; flex-direction: column; height: 100vh; }
         
-        /* Navigation Styles */
-        nav { background: #2c2c2c; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; height: 50px; border-bottom: 2px solid #3a3a3a; }
-        .nav-brand { font-weight: bold; font-size: 1.2rem; color: #44adff; }
-        .nav-links { display: flex; gap: 10px; }
-        .nav-btn { background: none; border: none; color: #aaa; padding: 15px 20px; font-size: 1rem; cursor: pointer; transition: 0.2s; }
-        .nav-btn:hover, .nav-btn.active { color: #fff; background: #3a3a3a; border-bottom: 3px solid #44adff; }
-        
-        /* Connection Status Header */
-        #connection-bar { background: #111; font-size: 0.85rem; padding: 5px 20px; text-align: right; color: #00ff66; border-bottom: 1px solid #222; }
+        /* Nav & Structure */
+        nav { background: #2f3136; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; height: 50px; border-bottom: 1px solid #202225; }
+        .nav-brand { font-weight: bold; color: #44adff; }
+        .nav-links { display: flex; gap: 5px; }
+        .nav-btn { background: none; border: none; color: #b9bbbe; padding: 15px 20px; font-size: 0.95rem; cursor: pointer; }
+        .nav-btn.active { color: #fff; border-bottom: 2px solid #44adff; background: #36393f; }
+        #connection-bar { background: #000; font-size: 0.8rem; padding: 4px 20px; text-align: right; color: #43b581; }
 
-        /* Content Container & Tabs */
-        #content-area { flex-grow: 1; position: relative; overflow-y: auto; padding: 20px; }
-        .tab-panel { display: none; height: 100%; }
+        #content-area { flex-grow: 1; position: relative; }
+        .tab-panel { display: none; height: calc(100vh - 78px); }
         .tab-panel.active { display: block; }
 
-        /* Setup / Welcome Display */
-        .setup-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80% ; gap: 20px;}
-        .primary-btn { padding: 15px 30px; font-size: 1.1rem; font-weight: bold; background: #44adff; border: none; border-radius: 6px; cursor: pointer; color: white; }
-        .primary-btn:hover { background: #3399ff; }
-
-        /* Character Sheet Grid Layout */
-        .sheet-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-        .character-card { background: #2a2a2a; border: 1px solid #444; border-radius: 8px; padding: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-        .character-card h3 { margin-top: 0; color: #44adff; border-bottom: 1px solid #444; padding-bottom: 5px; }
-        .form-group { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .form-group label { font-size: 0.9rem; color: #ccc; }
-        .form-group input { background: #333; border: 1px solid #555; color: white; padding: 6px; border-radius: 4px; width: 80px; text-align: center; }
-
-        /* Notes & Canvas Centering Layout */
-        .centered-view { display: flex; flex-direction: column; align-items: center; gap: 15px; }
-        canvas { background: #111; border: 2px solid #444; border-radius: 4px; cursor: grab; }
-        textarea { width: 100%; max-width: 600px; height: 300px; background: #2a2a2a; color: #fff; border: 1px solid #444; padding: 15px; border-radius: 6px; resize: none; font-size: 1rem; }
+        /* Vault Explorer Layout */
+        .vault-layout { display: flex; height: 100%; }
+        .file-tree-sidebar { width: 260px; background: #2f3136; border-right: 1px solid #202225; padding: 15px; overflow-y: auto; box-sizing: border-box; }
+        .editor-view { flex-grow: 1; display: flex; flex-direction: column; padding: 25px; background: #36393f; overflow-y: auto; }
         
+        /* Folder Tree UI elements */
+        .tree-folder { font-weight: bold; color: #f8b63e; margin: 8px 0 4px 0; cursor: pointer; user-select: none; }
+        .tree-file { padding: 4px 12px; color: #b9bbbe; cursor: pointer; border-radius: 4px; font-size: 0.95rem; }
+        .tree-file:hover, .tree-file.active { background: #40444b; color: #fff; }
+        .tree-children { margin-left: 15px; border-left: 1px solid #4f545c; padding-left: 10px; }
+
+        /* Split-screen Markdown Editing Layout */
+        .md-workspace { display: flex; gap: 20px; flex-grow: 1; height: 85%; }
+        textarea { flex: 1; background: #2f3136; color: #fff; border: 1px solid #202225; border-radius: 4px; padding: 15px; font-family: monospace; font-size: 1rem; resize: none; }
+        .md-preview { flex: 1; background: #2f3136; border: 1px solid #202225; border-radius: 4px; padding: 15px; overflow-y: auto; }
+        .md-preview h1, .md-preview h2 { color: #fff; border-bottom: 1px solid #4f545c; padding-bottom: 4px; }
+
+        /* Canvas Panel Layout */
+        .canvas-container { display: flex; justify-content: center; align-items: center; height: 100%; background: #23272a; }
+        canvas { background: #111; border: 1px solid #4f545c; border-radius: 4px; }
+        
+        .setup-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 20px; }
+        .btn { padding: 12px 24px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; background: #44adff; color: white; }
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <!-- Top Navigation Bar -->
     <nav>
-        <div class="nav-brand">Custom 5e VTT Dashboard</div>
+        <div class="nav-brand">Obsidian-Style VTT Dashboard</div>
         <div class="nav-links hidden" id="main-navigation">
-            <button class="nav-btn active" onclick="switchTab('tab-map', this)">Tactical Map</button>
-            <button class="nav-btn" onclick="switchTab('tab-sheets', this)">Character Sheets</button>
-            <button class="nav-btn" onclick="switchTab('tab-notes', this)">Campaign Notes</button>
+            <button class="nav-btn active" onclick="switchTab('tab-notes', this)">Markdown Notebook</button>
+            <button class="nav-btn" onclick="switchTab('tab-map', this)">Tactical Map</button>
         </div>
     </nav>
-    <div id="connection-bar">System Standby</div>
+    <div id="connection-bar">Offline</div>
 
-    <!-- Central Action Hub -->
     <div id="content-area">
-
-        <!-- Initial Configuration Screen -->
+        <!-- Setup Screen -->
         <div id="setup-panel" class="tab-panel active">
             <div class="setup-screen">
-                <h2>Initialize Your Session</h2>
-                <div style="display: flex; gap: 20px;">
-                    <button class="primary-btn" onclick="initSession('DM')">Launch as Dungeon Master</button>
-                    <button class="primary-btn" style="background:#44ffaa; color:#111;" onclick="initSession('Player')">Launch as Active Player</button>
+                <h2>Initialize Campaign Vault</h2>
+                <div style="display: flex; gap: 15px;">
+                    <button class="btn" onclick="initSession('DM')">Setup Dungeon Master Hub</button>
+                    <button class="btn" style="background:#43b581;" onclick="initSession('Player')">Join as Player</button>
                 </div>
             </div>
         </div>
 
-        <!-- Tab 1: Tactical Grid Map -->
-        <div id="tab-map" class="tab-panel">
-            <div class="centered-view">
-                <h3>Battle Map Grid</h3>
-                <canvas id="vttCanvas" width="600" height="400"></canvas>
-            </div>
-        </div>
-
-        <!-- Tab 2: Dynamic Character Sheets -->
-        <div id="tab-sheets" class="tab-panel">
-            <h2>Party Roster</h2>
-            <div class="sheet-container" id="sheets-wrapper">
-                <!-- Data injection point via updateSheetsUI() -->
-            </div>
-        </div>
-
-        <!-- Tab 3: Campaign Journals -->
+        <!-- Markdown Vault Tab -->
         <div id="tab-notes" class="tab-panel">
-            <div class="centered-view">
-                <h3 id="notes-title">Shared Campaign Log</h3>
-                <textarea id="campaign-notes" oninput="handleNotesInput(this.value)" placeholder="Start typing session tracking data here..."></textarea>
+            <div class="vault-layout">
+                <div class="file-tree-sidebar" id="sidebar-tree">
+                    <!-- File directories inject here -->
+                </div>
+                <div class="editor-view">
+                    <h2 id="active-file-title" style="margin-top:0; color:#fff;">Select a file from your vault</h2>
+                    <div class="md-workspace">
+                        <textarea id="markdown-editor" class="hidden" oninput="handleMarkdownEdit(this.value)" placeholder="Write your markdown formatting here..."></textarea>
+                        <div id="markdown-preview" class="md-preview">Select an .md file to preview its content.</div>
+                    </div>
+                </div>
             </div>
         </div>
 
+        <!-- Map Tab -->
+        <div id="tab-map" class="tab-panel">
+            <div class="canvas-container">
+                <canvas id="vttCanvas" width="700" height="500"></canvas>
+            </div>
+        </div>
     </div>
 
     <script>
-        let role = null;
-        let peer = null;
-        let conn = null;
+        let role = null; let peer = null; let conn = null;
+        let activeFilePath = ["Campaign Notes", "Session 1 Summary.md"]; // Tracks open file location paths
 
-        // Structured state reflecting layout fields
+        // Custom state modeled precisely after local directory file concepts
         let gameState = {
-            tokenX: 150,
-            tokenY: 150,
-            tokenRadius: 20,
-            notes: "",
-            characters: {
-                char1: { name: "Valeros (Fighter)", currentHp: 24, maxHp: 28, str: 16, dex: 12, AC: 16 },
-                char2: { name: "Mialee (Wizard)", currentHp: 12, maxHp: 16, str: 8, dex: 14, AC: 12 }
+            tokenX: 100, tokenY: 100,
+            vault: {
+                "Campaign Notes": {
+                    type: "folder",
+                    children: {
+                        "Session 1 Summary.md": { type: "file", content: "# Session 1 Summary\nThe party arrived at the town of Phandalin.\n\n### Active Quests\n- [ ] Investigate the sleeping dragon.\n- [x] Buy health potions." },
+                        "World Lore.md": { type: "file", content: "# World History\nThe land was shaped 2,000 years ago during the *Great Cataclysm*." }
+                    }
+                },
+                "Monsters & NPCs": {
+                    type: "folder",
+                    children: {
+                        "Goblin Boss.md": { type: "file", content: "### Klarg the Goblin\n**Armor Class:** 13\n**Hit Points:** 22\n\n- Scimitar Attack (+4 to hit)" }
+                    }
+                }
             }
         };
 
-        let isDragging = false;
-        const canvas = document.getElementById('vttCanvas');
-        const ctx = canvas.getContext('2d');
-
-        // Handles tab panel switching logic
-        function switchTab(panelId, buttonNode) {
-            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-            
-            document.getElementById(panelId).classList.add('active');
-            buttonNode.classList.add('active');
-
-            if (panelId === 'tab-map') renderMap();
+        function switchTab(id, btn) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            btn.classList.add('active');
+            if(id === 'tab-map') renderMap();
         }
 
-        // Initialize Peer System connections
-        function initSession(selectedRole) {
-            role = selectedRole;
+        function initSession(chosenRole) {
+            role = chosenRole;
             document.getElementById('setup-panel').classList.remove('active');
             document.getElementById('main-navigation').classList.remove('hidden');
-            document.getElementById('tab-map').classList.add('active');
+            document.getElementById('tab-notes').classList.add('active');
 
             if (role === 'DM') {
-                document.getElementById('notes-title').innerText = "DM Core Campaign Notebook";
-                peer = new Peer('vtt-synchronized-room-999');
-                peer.on('open', (id) => {
-                    document.getElementById('connection-bar').innerText = `DM Status: Broadcasting Room ID [ ${id} ]`;
-                });
-                peer.on('connection', (connection) => {
-                    conn = connection;
-                    document.getElementById('connection-bar').innerText = "Player Connected. Sync Engine Live.";
-                    setupDataListener();
-                    sendState();
-                });
+                document.getElementById('markdown-editor').classList.remove('hidden');
+                peer = new Peer('vault-vtt-room-abc');
+                peer.on('open', id => document.getElementById('connection-bar').innerText = `DM Mode | Server Live: ${id}`);
+                peer.on('connection', c => { conn = c; setupDataListener(); sync(); });
             } else {
-                document.getElementById('notes-title').innerText = "Player Shared Log View";
-                document.getElementById('campaign-notes').disabled = true; // Lock notes interface for players
-                document.getElementById('connection-bar').innerText = "Handshaking with DM Peer ID...";
+                document.getElementById('markdown-editor').classList.add('hidden'); // Blind editor panel from players
                 peer = new Peer();
+                document.getElementById('connection-bar').innerText = "Linking to Campaign Server...";
                 peer.on('open', () => {
-                    conn = peer.connect('vtt-synchronized-room-999');
+                    conn = peer.connect('vault-vtt-room-abc');
                     conn.on('open', () => {
-                        document.getElementById('connection-bar').innerText = "Connected to DM. Sync Engine Live.";
+                        document.getElementById('connection-bar').innerText = "Connected to DM Vault.";
                         setupDataListener();
                     });
                 });
             }
-            updateSheetsUI();
-            renderMap();
+            buildFileTreeUI();
+            openFile();
         }
 
-        // Monitors Peer connection channels for state adjustments
         function setupDataListener() {
-            conn.on('data', (data) => {
+            conn.on('data', data => {
                 if (data.type === 'SYNC') {
                     gameState = data.state;
+                    buildFileTreeUI();
                     
-                    // Don't update the active text textarea element while typing to avoid jerky cursor resets
-                    if (role === 'Player') {
-                        document.getElementById('campaign-notes').value = gameState.notes;
+                    // Live dynamic sync of open file preview content blocks
+                    const fileObj = getFileFromPath(activeFilePath);
+                    if (fileObj) {
+                        document.getElementById('markdown-preview').innerHTML = marked.parse(fileObj.content);
+                        if (role === 'DM') document.getElementById('markdown-editor').value = fileObj.content;
                     }
-                    
-                    updateSheetsUI();
                     renderMap();
                 }
             });
         }
 
-        function sendState() {
-            if (conn && conn.open) {
-                conn.send({ type: 'SYNC', state: gameState });
-            }
-        }
+        function sync() { if (conn && conn.open) conn.send({ type: 'SYNC', state: gameState }); }
 
-        // Dynamically populates and maps HTML components from state
-        function updateSheetsUI() {
-            const wrapper = document.getElementById('sheets-wrapper');
-            wrapper.innerHTML = ''; // Wipe and re-render updates
-
-            Object.keys(gameState.characters).forEach(key => {
-                const char = gameState.characters[key];
-                const card = document.createElement('div');
-                card.className = 'character-card';
-                card.innerHTML = `
-                    <h3>${char.name}</h3>
-                    <div class="form-group">
-                        <label>Current HP</label>
-                        <input type="number" value="${char.currentHp}" onchange="updateStat('${key}', 'currentHp', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label>Max HP</label>
+        // Recursively traces your state objects to build nested folder navigation elements
+        function buildFileTreeUI() {
+            const container = document.getElementById('sidebar-tree');
+            container.innerHTML = '<h3>Vault Navigation</h3>';
+            
+            function parseNode(obj, parentElement, currentPathArr) {
+                Object.keys(obj).forEach(key => {
+                    const node = obj[key];
+                    const nextPath = [...currentPathArr, key];
+                    
+                    if (node.type === 'folder') {
+                        const folderDiv = document.createElement('div');
+                        folderDiv.className = 'tree-folder';
+                        folderDiv.innerText = `📁 ${key}`;
 Use code with caution.
-Armor Class (AC)
-Strength
-`;
-wrapper.appendChild(card);
+parentElement.appendChild(folderDiv);
+const childContainer = document.createElement('div');
+childContainer.className = 'tree-children';
+parentElement.appendChild(childContainer);
+parseNode(node.children, childContainer, nextPath);
+} else {
+const fileDiv = document.createElement('div');
+fileDiv.className = 'tree-file';
+fileDiv.innerText = 📄 ${key};
+if (JSON.stringify(nextPath) === JSON.stringify(activeFilePath)) fileDiv.classList.add('active');
+fileDiv.onclick = () => {
+activeFilePath = nextPath;
+document.querySelectorAll('.tree-file').forEach(f => f.classList.remove('active'));
+fileDiv.classList.add('active');
+openFile();
+};
+parentElement.appendChild(fileDiv);
+}
 });
 }
-// Updates inner values upon field interactions and pushes state downstream
-function updateStat(charKey, statField, val) {
-gameState.characters[charKey][statField] = parseInt(val) || 0;
-sendState();
+parseNode(gameState.vault, container, []);
 }
-function handleNotesInput(text) {
-gameState.notes = text;
-sendState();
+function getFileFromPath(pathArr) {
+let current = gameState.vault;
+for (let i = 0; i < pathArr.length; i++) {
+if (i === pathArr.length - 1) return current[pathArr[i]];
+current = current[pathArr[i]].children;
 }
-// Basic Canvas Renderer Matrix
+return null;
+}
+function openFile() {
+const fileObj = getFileFromPath(activeFilePath);
+if (!fileObj) return;
+document.getElementById('active-file-title').innerText = activeFilePath[activeFilePath.length - 1];
+document.getElementById('markdown-editor').value = fileObj.content;
+// Parse Markdown into structured display content HTML layouts using Marked.js
+document.getElementById('markdown-preview').innerHTML = marked.parse(fileObj.content);
+}
+function handleMarkdownEdit(text) {
+const fileObj = getFileFromPath(activeFilePath);
+if (fileObj) {
+fileObj.content = text;
+document.getElementById('markdown-preview').innerHTML = marked.parse(text);
+sync();
+}
+}
+/* Minimal Map Logic for fallback cross checking continuity /
+const canvas = document.getElementById('vttCanvas'); const ctx = canvas.getContext('2d'); let drag = false;
 function renderMap() {
-ctx.clearRect(0, 0, canvas.width, canvas.height);
-ctx.strokeStyle = '#2d2d2d';
-for (let i = 0; i < canvas.width; i += 40) {
-ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+ctx.clearRect(0,0,700,500); ctx.fillStyle="#333"; ctx.fillRect(0,0,700,500);
+ctx.beginPath(); ctx.arc(gameState.tokenX, gameState.tokenY, 20, 0, Math.PI2);
+ctx.fillStyle="#44adff"; ctx.fill(); ctx.stroke();
 }
-for (let j = 0; j < canvas.height; j += 40) {
-ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(canvas.width, j); ctx.stroke();
-}
-ctx.beginPath();
-ctx.arc(gameState.tokenX, gameState.tokenY, gameState.tokenRadius, 0, Math.PI * 2);
-ctx.fillStyle = '#ff4444';
-ctx.fill();
-ctx.strokeStyle = '#fff';
-ctx.lineWidth = 2;
-ctx.stroke();
-}
-// Coordinate interaction monitors
-canvas.addEventListener('mousedown', (e) => {
-const rect = canvas.getBoundingClientRect();
-const mouseX = e.clientX - rect.left;
-const mouseY = e.clientY - rect.top;
-if (Math.sqrt((mouseX - gameState.tokenX)**2 + (mouseY - gameState.tokenY)**2) < gameState.tokenRadius) {
-isDragging = true;
-}
+canvas.addEventListener('mousedown', e => drag = true);
+canvas.addEventListener('mousemove', e => {
+if(!drag) return; const r = canvas.getBoundingClientRect();
+gameState.tokenX = e.clientX - r.left; gameState.tokenY = e.clientY - r.top;
+renderMap(); sync();
 });
-canvas.addEventListener('mousemove', (e) => {
-if (!isDragging) return;
-const rect = canvas.getBoundingClientRect();
-gameState.tokenX = e.clientX - rect.left;
-gameState.tokenY = e.clientY - rect.top;
-renderMap();
-sendState();
-});
-canvas.addEventListener('mouseup', () => isDragging = false);
+canvas.addEventListener('mouseup', () => drag = false);
