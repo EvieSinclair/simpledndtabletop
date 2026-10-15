@@ -2,350 +2,52 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Immersive Vault Engine</title>
-    <script src="https://cloudflare.com"></script>
-    <script src="https://jsdelivr.net"></script>
+    <title>Campaign Portal - Login</title>
     <style>
         body { 
-            margin: 0; 
-            font-family: 'Georgia', serif; 
+            margin: 0; font-family: 'Georgia', serif; 
             background: #111 url('https://unsplash.com') no-repeat center center fixed; 
-            background-size: cover;
-            color: #2c1d11; 
-            display: flex; 
-            flex-direction: column; 
-            height: 100vh; 
-            overflow: hidden;
+            background-size: cover; display: flex; align-items: center; justify-content: center; height: 100vh; 
         }
-        
-        nav { background: rgba(20, 15, 10, 0.85); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; height: 50px; border-bottom: 2px solid #3d2b1f; backdrop-filter: blur(5px); }
-        .nav-brand { font-weight: bold; color: #d4b375; font-family: monospace; letter-spacing: 1px; }
-        .nav-links { display: flex; gap: 5px; }
-        .nav-btn { background: none; border: none; color: #a39385; padding: 15px 20px; font-size: 0.95rem; cursor: pointer; font-family: sans-serif; }
-        .nav-btn.active { color: #d4b375; border-bottom: 2px solid #d4b375; background: rgba(255,255,255,0.05); }
-        #connection-bar { background: #000; font-size: 0.8rem; padding: 4px 20px; text-align: right; color: #ffaa00; font-weight: bold; font-family: sans-serif; }
-
-        #content-area { flex-grow: 1; position: relative; }
-        .tab-panel { display: none; height: calc(100vh - 78px); }
-        .tab-panel.active { display: block; }
-
-        .vault-layout { display: flex; height: 100%; }
-        
-        .file-tree-sidebar { 
-            width: 260px; 
-            background: rgba(31, 24, 18, 0.9); 
-            border-right: 1px solid #3d2b1f; 
-            padding: 15px; 
-            overflow-y: auto; 
-            box-sizing: border-box; 
-            color: #d4c5b9;
-            font-family: sans-serif;
-            backdrop-filter: blur(5px);
+        .login-card { 
+            background: rgba(30, 25, 20, 0.95); padding: 40px; border-radius: 8px; 
+            border: 2px solid #3d2b1f; text-align: center; color: #d4c5b9; box-shadow: 0 10px 30px rgba(0,0,0,0.6); backdrop-filter: blur(5px);
         }
-        
-        .display-viewport { 
-            flex-grow: 1; 
-            padding: 40px; 
-            overflow-y: auto; 
-            display: flex; 
-            justify-content: center;
-        }
-
-        .paper-document {
-            background: #f4eae1 url('https://transparenttextures.com');
-            color: #2c1d11;
-            width: 100%;
-            max-width: 800px;
-            min-height: 500px;
-            padding: 50px;
-            box-sizing: border-box;
-            border-radius: 4px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            border: 1px solid #dcd1c4;
-            position: relative;
-            line-height: 1.6;
-        }
-        
-        .tree-folder { font-weight: bold; color: #d4b375; margin: 12px 0 4px 0; cursor: pointer; user-select: none; }
-        .tree-file { padding: 5px 12px; color: #a39385; cursor: pointer; border-radius: 4px; font-size: 0.95rem; }
-        .tree-file:hover, .tree-file.active { background: rgba(212, 179, 117, 0.15); color: #fff; }
-        .tree-children { margin-left: 15px; border-left: 1px solid #3d2b1f; padding-left: 10px; }
-
-        textarea { 
-            width: 100%; 
-            height: 400px; 
-            background: rgba(255,255,255,0.6); 
-            color: #111; 
-            border: 1px solid #bda895; 
-            border-radius: 4px; 
-            padding: 15px; 
-            font-family: monospace; 
-            font-size: 1.05rem; 
-            resize: none; 
-            box-sizing: border-box;
-        }
-        
-        .paper-document h1 { font-size: 2.2rem; margin-top: 0; color: #5c1e13; border-bottom: 2px solid #bda895; padding-bottom: 8px; }
-        .paper-document h2 { font-size: 1.6rem; color: #5c1e13; margin-top: 30px; }
-        .paper-document h3 { font-size: 1.2rem; color: #7a3e35; }
-        .paper-document hr { border: 0; border-top: 1px solid #bda895; margin: 20px 0; }
-        
-        .control-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-family: sans-serif; }
-        .action-toggle-btn { background: #5c1e13; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .action-toggle-btn:hover { background: #7a3e35; }
-
-        .canvas-container { display: flex; justify-content: center; align-items: center; height: 100%; }
-        canvas { background: rgba(17, 17, 17, 0.9); border: 2px solid #3d2b1f; border-radius: 4px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); }
-        
-        .setup-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 20px; background: rgba(20,15,10,0.8); width: 100%; }
-        .setup-card { background: #2f3136; padding: 40px; border-radius: 8px; border: 1px solid #4f545c; text-align: center; color: white; box-shadow: 0 10px 25px rgba(0,0,0,0.5); font-family: sans-serif; }
-        .btn { padding: 12px 24px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; background: #d4b375; color: #111; margin: 5px; font-size: 1rem; }
-        .btn:hover { background: #ecd09b; }
-        input[type="text"] { padding: 12px; border-radius: 4px; border: 1px solid #4f545c; background: #1e1e1e; color: white; width: 250px; text-align: center; font-size: 1rem; margin-bottom: 10px; }
-        .hidden { display: none !important; }
+        h2 { color: #d4b375; margin-top: 0; letter-spacing: 1px; }
+        .btn { padding: 12px 28px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; margin: 10px; font-size: 1rem; transition: 0.2s; }
+        .btn-dm { background: #d4b375; color: #111; }
+        .btn-dm:hover { background: #ecd09b; }
+        .btn-player { background: #5c1e13; color: white; }
+        .btn-player:hover { background: #7a3e35; }
+        input[type="text"] { padding: 12px; border-radius: 4px; border: 1px solid #3d2b1f; background: #111; color: white; width: 220px; text-align: center; font-size: 1rem; margin-top: 15px; }
     </style>
 </head>
 <body>
 
-    <nav>
-        <div class="nav-brand">IMMERSIVE CAMPAIGN VAULT</div>
-        <div class="nav-links hidden" id="main-navigation">
-            <button class="nav-btn active" onclick="switchTab('tab-notes', this)">Journal Vault</button>
-            <button class="nav-btn" onclick="switchTab('tab-map', this)">Tactical Map</button>
-        </div>
-    </nav>
-    <div id="connection-bar">System Ready</div>
-
-    <div id="content-area">
-        <div id="setup-panel" class="tab-panel active">
-            <div class="setup-screen">
-                <div class="setup-card">
-                    <h2>Initialize Session Matrix</h2>
-                    <button class="btn" onclick="initDM()">Host Game as DM</button>
-                    <div style="margin: 25px 0; border-top: 1px solid #444; position: relative;"></div>
-                    <input type="text" id="join-room-id" placeholder="Paste DM Room Code..."><br>
-                    <button class="btn" style="background:#43b581; color:white;" onclick="initPlayer()">Join Game as Player</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="tab-notes" class="tab-panel">
-            <div class="vault-layout">
-                <div class="file-tree-sidebar" id="sidebar-tree"></div>
-                <div class="display-viewport">
-                    <div class="paper-document">
-                        <div class="control-header">
-                            <span id="active-file-breadcrumb" style="font-weight: bold; color: #7a3e35; font-size: 0.9rem;">NO FILE OPENED</span>
-                            <button id="edit-toggle-btn" class="action-toggle-btn hidden" onclick="toggleEditMode()">Switch to Editor</button>
-                        </div>
-                        
-                        <div id="markdown-container-view">
-                            <div id="markdown-preview">Select an .md page folder node to begin rendering document strings...</div>
-                        </div>
-                        <div id="markdown-container-edit" class="hidden">
-                            <textarea id="markdown-editor" oninput="handleMarkdownEdit(this.value)"></textarea>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="tab-map" class="tab-panel">
-            <div class="canvas-container">
-                <canvas id="vttCanvas" width="700" height="500"></canvas>
-            </div>
-        </div>
+    <div class="login-card">
+        <h2>CAMPAIGN PORTAL</h2>
+        <p>Select your table operating clearance:</p>
+        
+        <!-- Routes directly to your standalone DM file -->
+        <button class="btn btn-dm" onclick="window.location.href='dm.html'">Host as Dungeon Master</button>
+        
+        <div style="margin: 20px 0; border-top: 1px solid #3d2b1f;"></div>
+        
+        <!-- Routes directly to your standalone Player file with their code attached -->
+        <input type="text" id="code-input" placeholder="Enter DM Room Code..."><br>
+        <button class="btn btn-player" onclick="joinAsPlayer()">Join as Party Player</button>
     </div>
 
     <script>
-        let role = null; let peer = null; let conn = null;
-        let isEditing = false;
-        let activeFilePath = ["Campaign Notes", "Session 1 Summary.md"];
-
-        // FIXED INFRASTRUCTURE: We route through a reliable open signaling cluster instead of the crashy 0.peerjs.com defaults.
-        const networkConfig = {
-            host: '0.peerjs.com',
-            port: 443,
-            path: '/',
-            secure: true,
-            config: {
-                iceServers: [
-                    { urls: 'stun:://google.com' },
-                    { urls: 'stun:://twilio.com' }
-                ]
+        function joinAsPlayer() {
+            const code = document.getElementById('code-input').value.trim();
+            if (!code) {
+                alert("Please enter a DM Room Code first!");
+                return;
             }
-        };
-
-        let gameState = {
-            tokenX: 100, tokenY: 100,
-            vault: {
-                "Campaign Notes": {
-                    type: "folder",
-                    children: {
-                        "Session 1 Summary.md": { type: "file", content: "# Session 1 Summary\nThe party arrived safely at the rustic town of Phandalin.\n\n***\n\n### Current Milestone Progress\n- [ ] Interrogate the townmaster.\n- [x] Secure sleeping quarters at the inn.\n\n### Rumors Overheard\n1. Bandits are shaking down local shopkeepers.\n2. Something strange is howling in the eastern woods at night." },
-                        "World Lore.md": { type: "file", content: "# World History\nThe surrounding mountain peak ranges were completely forged 2,000 years ago during the high magic *Great Cataclysm*." }
-                    }
-                },
-                "Monsters & NPCs": {
-                    type: "folder",
-                    children: {
-                        "Goblin Boss.md": { type: "file", content: "# Klarg the Goblin Boss\nAn oversized bugbear tracking local trade wagons.\n\n### Combat Matrix Statistics\n- **Armor Class:** 13 (Leather Armor)\n- **Hit Points:** 22 (4d8 + 4)\n\n### Actions\n* **Morningstar:** `+4 to hit`, damage `2d8+2` bludgeoning damage." }
-                    }
-Use code with caution.
-}
-}
-};
-function switchTab(id, btn) {
-document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-document.getElementById(id).classList.add('active');
-btn.classList.add('active');
-if(id === 'tab-map') renderMap();
-}
-function toggleEditMode() {
-const btn = document.getElementById('edit-toggle-btn');
-const viewBlock = document.getElementById('markdown-container-view');
-const editBlock = document.getElementById('markdown-container-edit');
-if (isEditing) {
-isEditing = false;
-btn.innerText = "Switch to Editor";
-viewBlock.classList.remove('hidden');
-editBlock.classList.add('hidden');
-} else {
-isEditing = true;
-btn.innerText = "View Formatted Page";
-viewBlock.classList.add('hidden');
-editBlock.remove('hidden');
-editBlock.classList.remove('hidden');
-}
-}
-function initDM() {
-role = 'DM';
-document.getElementById('connection-bar').innerText = "Connecting to Reliable Master Nodes...";
-// Explicitly force Google/Twilio fallback nodes to force activation instantly
-peer = new Peer(networkConfig);
-peer.on('open', id => {
-setupUI();
-document.getElementById('edit-toggle-btn').classList.remove('hidden');
-document.getElementById('connection-bar').style.color = "#ffaa00";
-document.getElementById('connection-bar').innerText = DM Mode | Share Code: ${id};
-});
-peer.on('connection', c => { conn = c; handleConnect(); });
-peer.on('error', handleNetworkError);
-}
-function initPlayer() {
-role = 'Player';
-const dmId = document.getElementById('join-room-id').value.trim();
-if (!dmId) { alert("Please type the DM's connection code first!"); return; }
-document.getElementById('connection-bar').innerText = "Locating Connection Channels...";
-peer = new Peer(networkConfig);
-peer.on('open', () => {
-conn = peer.connect(dmId);
-conn.on('open', () => { setupUI(); handleConnect(); });
-conn.on('error', handleNetworkError);
-});
-peer.on('error', handleNetworkError);
-}
-function handleNetworkError(err) {
-document.getElementById('connection-bar').style.color = "#ff4444";
-document.getElementById('connection-bar').innerText = Handshake Node Error: ${err.type}. Try clicking again.;
-console.error(err);
-}
-function setupUI() {
-document.getElementById('setup-panel').classList.remove('active');
-document.getElementById('main-navigation').classList.remove('hidden');
-document.getElementById('tab-notes').classList.add('active');
-buildFileTreeUI();
-openFile();
-}
-function handleConnect() {
-document.getElementById('connection-bar').style.color = "#43b581";
-document.getElementById('connection-bar').innerText = "Sync Channels Online & Connected";
-setupDataListener();
-if (role === 'DM') sync();
-}
-function setupDataListener() {
-conn.on('data', data => {
-if (data.type === 'SYNC') {
-gameState = data.state;
-buildFileTreeUI();
-const fileObj = getFileFromPath(activeFilePath);
-if (fileObj) {
-document.getElementById('markdown-preview').innerHTML = marked.parse(fileObj.content);
-if (role === 'DM') document.getElementById('markdown-editor').value = fileObj.content;
-}
-renderMap();
-}
-});
-}
-function sync() { if (conn && conn.open) conn.send({ type: 'SYNC', state: gameState }); }
-function buildFileTreeUI() {
-const container = document.getElementById('sidebar-tree');
-container.innerHTML = 'Vault Explorer';
-function parseNode(obj, parentElement, currentPathArr) {
-Object.keys(obj).forEach(key => {
-const node = obj[key];
-const nextPath = [...currentPathArr, key];
-if (node.type === 'folder') {
-const folderDiv = document.createElement('div');
-folderDiv.className = 'tree-folder';
-folderDiv.innerText = 📁 ${key};
-parentElement.appendChild(folderDiv);
-const childContainer = document.createElement('div');
-childContainer.className = 'tree-children';
-parentElement.appendChild(childContainer);
-parseNode(node.children, childContainer, nextPath);
-} else {
-const fileDiv = document.createElement('div');
-fileDiv.className = 'tree-file';
-fileDiv.innerText = 📄 ${key};
-if (JSON.stringify(nextPath) === JSON.stringify(activeFilePath)) fileDiv.classList.add('active');
-fileDiv.onclick = () => {
-activeFilePath = nextPath;
-document.querySelectorAll('.tree-file').forEach(f => f.classList.remove('active'));
-fileDiv.classList.add('active');
-if(isEditing) toggleEditMode();
-openFile();
-};
-parentElement.appendChild(fileDiv);
-}
-});
-}
-parseNode(gameState.vault, container, []);
-}
-function getFileFromPath(pathArr) {
-let current = gameState.vault;
-for (let i = 0; i < pathArr.length; i++) {
-if (i === pathArr.length - 1) return current[pathArr[i]];
-current = current[pathArr[i]].children;
-}
-return null;
-}
-function openFile() {
-const fileObj = getFileFromPath(activeFilePath);
-if (!fileObj) return;
-document.getElementById('active-file-breadcrumb').innerText = activeFilePath.join(" / ").toUpperCase();
-document.getElementById('markdown-editor').value = fileObj.content;
-document.getElementById('markdown-preview').innerHTML = marked.parse(fileObj.content);
-}
-function handleMarkdownEdit(text) {
-const fileObj = getFileFromPath(activeFilePath);
-if (fileObj) {
-fileObj.content = text;
-document.getElementById('markdown-preview').innerHTML = marked.parse(text);
-sync();
-}
-}
-const canvas = document.getElementById('vttCanvas'); const ctx = canvas.getContext('2d'); let drag = false;
-function renderMap() {
-ctx.clearRect(0,0,700,500); ctx.fillStyle="#222"; ctx.fillRect(0,0,700,500);
-ctx.beginPath(); ctx.arc(gameState.tokenX, gameState.tokenY, 20, 0, Math.PI*2);
-ctx.fillStyle="#d4b375"; ctx.fill(); ctx.stroke();
-}
-canvas.addEventListener('mousedown', e => drag = true);
-canvas.addEventListener('mousemove', e => {
-if(!drag) return; const r = canvas.getBoundingClientRect();
-gameState.tokenX = e.clientX - r.left; gameState.tokenY = e.clientY - r.top;
-renderMap(); sync();
-});
-canvas.addEventListener('mouseup', () => drag = false);
+            // Pass the typed code to the player page using a standard URL parameter
+            window.location.href = `player.html?room=${code}`;
+        }
+    </script>
+</body>
+</html>
